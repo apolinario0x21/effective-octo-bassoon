@@ -1,0 +1,10 @@
+# Binaries
+/effective-octo-bassoon
+*.exe
+
+# SQLite database
+*.db
+
+# IDE
+.idea/
+.vscode/
