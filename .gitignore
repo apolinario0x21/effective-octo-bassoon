@@ -1,5 +1,5 @@
 # Binaries
-/effective-octo-bassoon
+/bin/
 *.exe
 
 # SQLite database
