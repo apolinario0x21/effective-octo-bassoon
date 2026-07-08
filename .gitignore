@@ -1,0 +1,10 @@
+# Binaries
+/bin/
+*.exe
+
+# SQLite database
+*.db
+
+# IDE
+.idea/
+.vscode/
