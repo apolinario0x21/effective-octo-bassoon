@@ -1,40 +1,110 @@
 # Students API
 
+[![CI](https://github.com/apolinario0x21/effective-octo-bassoon/actions/workflows/ci.yml/badge.svg)](https://github.com/apolinario0x21/effective-octo-bassoon/actions/workflows/ci.yml)
+
 API RESTful para gerenciar estudantes, escrita em Go com [Echo](https://echo.labstack.com/)
 e [GORM](https://gorm.io/). Persistência em **PostgreSQL**, cache em **Redis** e
 observabilidade com **Prometheus** e **Grafana** — tudo orquestrado por **Docker Compose**.
 
-## Stack
+---
 
-| Camada          | Tecnologia                                   |
-| --------------- | -------------------------------------------- |
-| Linguagem       | Go 1.26                                       |
-| Framework HTTP  | Echo v4                                        |
-| ORM             | GORM                                           |
-| Banco           | PostgreSQL 16 (SQLite pure-Go em dev/testes)   |
-| Cache           | Redis 7                                        |
-| Métricas        | Prometheus (`/metrics` via echo-prometheus)    |
-| Dashboards      | Grafana (datasource e dashboard provisionados) |
-| Logs            | zerolog (JSON estruturado, com request ID)     |
-| Containers      | Docker + Docker Compose                        |
+## 🧒 Explicando como se você nunca tivesse programado
 
-## Rotas
+Imagine uma **secretaria de escola** que guarda uma ficha de cada aluno (nome, CPF,
+e-mail, idade e se está ativo). Este projeto é essa secretaria, só que digital.
 
-| Método | Rota                    | Descrição                            | Sucesso |
-| ------ | ----------------------- | ------------------------------------ | ------- |
-| GET    | `/healthz`              | Health check                         | 200     |
-| GET    | `/metrics`              | Métricas Prometheus                  | 200     |
-| GET    | `/students`             | Lista todos os estudantes            | 200     |
-| GET    | `/students?active=true` | Lista estudantes ativos (ou `false`) | 200     |
-| POST   | `/students`             | Cria um estudante                    | 201     |
-| GET    | `/students/:id`         | Mostra um estudante                  | 200     |
-| PUT    | `/students/:id`         | Atualiza um estudante (parcial)      | 200     |
-| DELETE | `/students/:id`         | Remove um estudante                  | 204     |
+- Você **conversa** com ela mandando "recadinhos" pela internet (chamados de
+  _requisições_). Cada recadinho pede uma coisa: "me mostre todos os alunos",
+  "cadastre esse aluno novo", "apague o aluno número 3".
+- A secretaria **guarda as fichas** num arquivo bem organizado (o banco de dados
+  PostgreSQL). É como um armário de gavetas que nunca esquece nada.
+- Para ser mais rápida, ela mantém as fichas mais pedidas numa **mesa ao lado**
+  (o cache Redis) — assim não precisa abrir a gaveta toda hora.
+- E tem um **painel de controle** (Grafana) que mostra em tempo real quantos
+  recadinhos chegaram, quais deram erro e quão rápido ela respondeu.
 
-Erros são retornados em JSON: `{"error": "mensagem"}` com o status HTTP adequado
-(400 para requisição inválida, 404 para não encontrado, 409 para CPF duplicado).
+Você não precisa entender nada disso para usar. Só precisa mandar os recadinhos.
+As próximas seções mostram como — passo a passo, sem pressa.
 
-## Modelo
+### O que é uma "rota"?
+
+Uma **rota** é um endereço + uma ação. Assim como uma casa tem um endereço, cada
+função da API tem o seu. Por exemplo, o endereço `/students` com a ação "GET"
+(pegar) significa "me dê a lista de alunos". Os verbos são sempre estes:
+
+| Verbo    | O que significa, em palavras simples          |
+| -------- | --------------------------------------------- |
+| `GET`    | "Me **mostre** algo" (só lê, não muda nada)   |
+| `POST`   | "**Crie** uma coisa nova"                     |
+| `PUT`    | "**Altere** uma coisa que já existe"          |
+| `DELETE` | "**Apague** uma coisa"                        |
+
+---
+
+## 🚀 Começando: rodando a aplicação pela primeira vez
+
+Você tem **dois caminhos**. Se está começando agora, use a **Opção 2** — é a mais
+simples e não instala nada além do Go.
+
+### Opção 2 (mais fácil) — rodar localmente, sem instalar banco nem cache
+
+O único pré-requisito é ter o **Go 1.25+** instalado ([baixe aqui](https://go.dev/dl/)).
+Abra um terminal na pasta do projeto e digite:
+
+```bash
+make run
+```
+
+Pronto! 🎉 A API sobe em `http://localhost:8080` usando um banco de dados de
+arquivo simples (SQLite) e sem cache. Isso é perfeito para testar e aprender.
+
+> **O que aconteceu?** O comando `make run` é um atalho. Por baixo ele roda a API
+> pedindo para usar o banco simples (`DB_DRIVER=sqlite`) e criando um arquivo
+> `student.db` na pasta. Nenhum programa externo é necessário.
+
+Para verificar se está no ar, abra **outro** terminal e peça um "sinal de vida":
+
+```bash
+curl http://localhost:8080/healthz
+```
+
+Se responder algo como `{"status":"ok"}`, está tudo funcionando.
+Para desligar, volte ao primeiro terminal e aperte `Ctrl + C`.
+
+### Opção 1 (completa) — a stack inteira com Docker
+
+Esta opção sobe **tudo junto** (API + PostgreSQL + Redis + Prometheus + Grafana).
+Você precisa ter o [Docker](https://docs.docker.com/get-docker/) instalado.
+
+```bash
+cp .env.example .env      # opcional: cria um arquivo de configuração; pode ajustar senhas
+make compose-up           # sobe tudo (equivale a: docker compose up --build -d)
+```
+
+Depois de alguns segundos, tudo estará no ar nestes endereços:
+
+| Serviço    | Onde acessar (abra no navegador)                | Para quê serve                        |
+| ---------- | ----------------------------------------------- | ------------------------------------- |
+| API        | http://localhost:8080                           | Onde você manda os recadinhos         |
+| Prometheus | http://localhost:9090                           | Coletor de estatísticas               |
+| Grafana    | http://localhost:3000  (login `admin`/`admin`)  | Painel visual bonito das estatísticas |
+
+Comandos úteis:
+
+```bash
+make compose-logs   # ver o que a API está fazendo, ao vivo
+make compose-down   # desligar tudo
+```
+
+---
+
+## 📬 Usando a API na prática (passo a passo)
+
+Vamos usar o `curl`, um programinha de terminal que manda recadinhos pela internet.
+(Se preferir clicar em botões, ferramentas como [Postman](https://www.postman.com/)
+ou [Insomnia](https://insomnia.rest/) fazem o mesmo de forma visual.)
+
+Cada aluno é uma ficha assim:
 
 ```json
 {
@@ -46,12 +116,121 @@ Erros são retornados em JSON: `{"error": "mensagem"}` com o status HTTP adequad
 }
 ```
 
-- `cpf` é uma string com 11 dígitos (sem pontuação), validado com os dígitos
-  verificadores; CPFs duplicados são rejeitados com 409.
-- `email` é validado quanto ao formato.
-- No `PUT`, todos os campos são opcionais — apenas os enviados são atualizados.
+> **Regrinhas das fichas:**
+> - `cpf`: 11 dígitos, **só números** (sem pontos ou traços). A API confere se o
+>   CPF é matematicamente válido e **não deixa cadastrar dois CPFs iguais**.
+> - `email`: precisa ter cara de e-mail de verdade.
+> - Ao **alterar** (PUT), você manda só os campos que quer mudar; o resto fica igual.
 
-## Arquitetura
+### 1. Cadastrar um aluno novo (POST)
+
+```bash
+curl -X POST localhost:8080/students \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Maria","cpf":"52998224725","email":"maria@example.com","age":22,"active":true}'
+```
+
+A API responde com a ficha criada, agora com um número de identificação (`id`).
+Guarde esse `id` — é como o número da carteirinha do aluno.
+
+### 2. Ver os alunos (GET)
+
+```bash
+curl localhost:8080/students              # todos os alunos
+curl "localhost:8080/students?active=true"  # só os que estão ativos
+curl localhost:8080/students/1            # só o aluno de id 1
+```
+
+### 3. Alterar um aluno (PUT)
+
+Digamos que a Maria fez aniversário. Mande **só** o campo que mudou:
+
+```bash
+curl -X PUT localhost:8080/students/1 \
+  -H 'Content-Type: application/json' \
+  -d '{"age":23}'
+```
+
+### 4. Apagar um aluno (DELETE)
+
+```bash
+curl -X DELETE localhost:8080/students/1
+```
+
+### E quando dá errado?
+
+A API sempre explica o erro em português-de-máquina (JSON), com um número que diz
+o "tipo" do problema:
+
+| Número | Significado                | Exemplo                                  |
+| ------ | -------------------------- | ---------------------------------------- |
+| `400`  | Você mandou algo inválido  | CPF com letras, e-mail sem `@`           |
+| `404`  | Não achei                  | Pediu o aluno 999 que não existe         |
+| `409`  | Conflito                   | Tentou cadastrar um CPF que já existe    |
+
+Exemplo de resposta de erro: `{"error": "cpf já cadastrado"}`.
+
+---
+
+## 📋 Referência das rotas
+
+| Método | Rota                    | Descrição                            | Sucesso |
+| ------ | ----------------------- | ------------------------------------ | ------- |
+| GET    | `/healthz`              | Sinal de vida (health check)         | 200     |
+| GET    | `/metrics`              | Métricas para o Prometheus           | 200     |
+| GET    | `/students`             | Lista todos os estudantes            | 200     |
+| GET    | `/students?active=true` | Lista estudantes ativos (ou `false`) | 200     |
+| POST   | `/students`             | Cria um estudante                    | 201     |
+| GET    | `/students/:id`         | Mostra um estudante                  | 200     |
+| PUT    | `/students/:id`         | Atualiza um estudante (parcial)      | 200     |
+| DELETE | `/students/:id`         | Remove um estudante                  | 204     |
+
+---
+
+## 🧰 Stack (as ferramentas usadas)
+
+| Camada          | Tecnologia                                     |
+| --------------- | ---------------------------------------------- |
+| Linguagem       | Go 1.25                                         |
+| Framework HTTP  | Echo v4                                         |
+| ORM             | GORM                                           |
+| Banco           | PostgreSQL 16 (SQLite pure-Go em dev/testes)   |
+| Cache           | Redis 7                                        |
+| Métricas        | Prometheus (`/metrics` via echo-prometheus)    |
+| Dashboards      | Grafana (datasource e dashboard provisionados) |
+| Logs            | zerolog (JSON estruturado, com request ID)     |
+| Containers      | Docker + Docker Compose                        |
+| CI              | GitHub Actions (lint, testes, build, docker)   |
+
+---
+
+## 🤖 Integração Contínua (CI)
+
+Toda vez que alguém envia código (push) ou abre um Pull Request para o branch
+`main`, o **GitHub Actions** roda automaticamente uma esteira de verificação —
+como um inspetor de qualidade que confere o trabalho antes de aceitá-lo. Se algo
+quebrar, o selo do topo do README fica vermelho. As etapas estão em
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml):
+
+| Etapa         | O que verifica                                                        |
+| ------------- | -------------------------------------------------------------------- |
+| **Lint & Vet**| Código formatado (`gofmt`), sem erros suspeitos (`go vet`) e `go.mod` em dia |
+| **Test**      | Roda todos os testes com detector de _race conditions_ e mede cobertura |
+| **Build**     | Garante que o binário compila                                         |
+| **Docker**    | Garante que a imagem Docker constrói                                  |
+
+Você pode rodar as mesmas checagens no seu computador antes de enviar:
+
+```bash
+make fmt    # formata o código
+make vet    # procura erros comuns
+make test   # roda os testes
+make build  # compila o binário
+```
+
+---
+
+## 🏛️ Arquitetura
 
 ```
 cmd/api/             # entrypoint: config, wiring (DB + cache) e graceful shutdown
@@ -62,6 +241,7 @@ internal/db/         # conexão (postgres/sqlite), pool e migrações
 internal/models/     # entidades de domínio
 internal/repository/ # acesso a dados (GORM) + decorator de cache (Redis)
 deploy/              # provisionamento de Prometheus e Grafana
+.github/workflows/   # pipeline de CI (GitHub Actions)
 ```
 
 O cache é aplicado como um **decorator** sobre o repositório: `CachedStudentRepository`
@@ -69,41 +249,12 @@ envolve o repositório GORM, cacheando leituras por ID e invalidando em update/d
 Falhas de cache nunca quebram a requisição — a operação recorre ao banco. Se `REDIS_ADDR`
 estiver vazio (ou o Redis indisponível), a API acessa o banco diretamente.
 
-## Como rodar
+---
 
-### Opção 1 — stack completa com Docker Compose (recomendado)
+## ⚙️ Configuração (variáveis de ambiente)
 
-Sobe API + PostgreSQL + Redis + Prometheus + Grafana:
-
-```bash
-cp .env.example .env      # opcional: ajuste credenciais
-make compose-up           # ou: docker compose up --build -d
-```
-
-| Serviço    | URL                                             |
-| ---------- | ----------------------------------------------- |
-| API        | http://localhost:8080                           |
-| Prometheus | http://localhost:9090                           |
-| Grafana    | http://localhost:3000  (admin/admin por padrão) |
-
-No Grafana, o dashboard **"Students API"** e o datasource Prometheus já vêm provisionados.
-
-```bash
-make compose-logs   # acompanha os logs da API
-make compose-down   # derruba a stack
-```
-
-### Opção 2 — local, sem dependências externas
-
-Usa SQLite (pure-Go, sem cgo) e sem Redis. Requer apenas Go 1.26+:
-
-```bash
-make run     # DB_DRIVER=sqlite, cache desabilitado
-make test    # roda os testes
-make build   # gera bin/api
-```
-
-## Configuração (variáveis de ambiente)
+Não precisa mexer em nada para começar (a Opção 2 já vem configurada). Estas
+variáveis servem para ajustar o comportamento em produção:
 
 | Variável         | Padrão      | Descrição                                        |
 | ---------------- | ----------- | ------------------------------------------------ |
@@ -122,28 +273,12 @@ make build   # gera bin/api
 | `REDIS_DB`       | `0`         | Índice do banco Redis                             |
 | `REDIS_TTL`      | `5m`        | TTL das entradas de cache                         |
 
-## Observabilidade
+---
+
+## 📊 Observabilidade
 
 - **Métricas**: `/metrics` expõe contadores e histogramas por rota/método/status
   (subsystem `students_*`), coletados pelo Prometheus a cada 15s.
 - **Dashboard**: painéis de request rate, taxa de erro (5xx), latência p50/p95/p99 e
   distribuição por status code.
 - **Logs**: JSON estruturado via zerolog, com `request_id` correlacionável.
-
-## Exemplos com curl
-
-```bash
-# Criar um estudante
-curl -X POST localhost:8080/students \
-  -H 'Content-Type: application/json' \
-  -d '{"name":"Maria","cpf":"52998224725","email":"maria@example.com","age":22,"active":true}'
-
-# Listar todos / apenas ativos
-curl localhost:8080/students
-curl "localhost:8080/students?active=true"
-
-# Buscar, atualizar (parcial) e remover
-curl localhost:8080/students/1
-curl -X PUT localhost:8080/students/1 -H 'Content-Type: application/json' -d '{"age":23}'
-curl -X DELETE localhost:8080/students/1
-```
