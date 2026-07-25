@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
 	"github.com/apolinario0x21/effective-octo-bassoon/internal/api"
@@ -21,16 +22,19 @@ const shutdownTimeout = 10 * time.Second
 
 func main() {
 	cfg := config.Load()
+	configureLogging(cfg.LogLevel)
 
-	database, err := db.Connect(cfg.DBPath)
+	database, err := db.Connect(cfg.DB)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to connect to database")
 	}
+	log.Info().Str("driver", cfg.DB.Driver).Msg("Connected to database")
 
 	students := repository.NewStudentRepository(database)
 	server := api.NewServer(students)
 
 	go func() {
+		log.Info().Str("port", cfg.Port).Msg("Starting server")
 		if err := server.Start(":" + cfg.Port); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatal().Err(err).Msg("Failed to start server")
 		}
@@ -48,4 +52,13 @@ func main() {
 	if err := server.Shutdown(ctx); err != nil {
 		log.Fatal().Err(err).Msg("Failed to shut down server gracefully")
 	}
+}
+
+func configureLogging(level string) {
+	zerolog.TimeFieldFormat = time.RFC3339
+	parsed, err := zerolog.ParseLevel(level)
+	if err != nil {
+		parsed = zerolog.InfoLevel
+	}
+	zerolog.SetGlobalLevel(parsed)
 }

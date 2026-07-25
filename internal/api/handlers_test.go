@@ -11,6 +11,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/apolinario0x21/effective-octo-bassoon/internal/api"
+	"github.com/apolinario0x21/effective-octo-bassoon/internal/config"
 	"github.com/apolinario0x21/effective-octo-bassoon/internal/db"
 	"github.com/apolinario0x21/effective-octo-bassoon/internal/repository"
 )
@@ -24,7 +25,10 @@ const (
 func newTestServer(t *testing.T) *api.Server {
 	t.Helper()
 
-	database, err := db.Connect(filepath.Join(t.TempDir(), "test.db"))
+	database, err := db.Connect(config.DBConfig{
+		Driver: "sqlite",
+		DSN:    filepath.Join(t.TempDir(), "test.db"),
+	})
 	if err != nil {
 		t.Fatalf("failed to connect to test database: %v", err)
 	}
