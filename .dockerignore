@@ -1,0 +1,21 @@
+# Git & CI
+.git
+.gitignore
+.github
+
+# Build artifacts
+bin/
+*.exe
+*.db
+
+# Local infra & docs (não precisam entrar na imagem)
+docker-compose.yml
+deploy/
+README.md
+*.md
+.env
+.env.*
+
+# Editor
+.idea/
+.vscode/
