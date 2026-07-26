@@ -10,7 +10,7 @@ import (
 	gormlogger "gorm.io/gorm/logger"
 
 	"github.com/apolinario0x21/students-api/internal/config"
-	"github.com/apolinario0x21/students-api/internal/models"
+	"github.com/apolinario0x21/students-api/migrations"
 )
 
 // Connect abre a conexão com o banco conforme o driver configurado
@@ -32,7 +32,7 @@ func Connect(cfg config.DBConfig) (*gorm.DB, error) {
 		return nil, err
 	}
 
-	if err := database.AutoMigrate(&models.Student{}); err != nil {
+	if err := migrations.Run(database, cfg.Driver); err != nil {
 		return nil, fmt.Errorf("running migrations: %w", err)
 	}
 
