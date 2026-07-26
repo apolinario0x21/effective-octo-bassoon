@@ -296,13 +296,28 @@ cmd/api/             # entrypoint: config, wiring (DB + cache) e graceful shutdo
 internal/api/        # camada HTTP: servidor, rotas, handlers, DTOs, validação, métricas
 internal/cache/      # cliente Redis
 internal/config/     # configuração via variáveis de ambiente
-internal/db/         # conexão (postgres/sqlite), pool e migrações
+internal/db/         # conexão (postgres/sqlite) e pool
 internal/models/     # entidades de domínio
 internal/repository/ # acesso a dados (GORM) + decorator de cache (Redis)
+migrations/          # migrações SQL versionadas + runner (postgres/ e sqlite/)
 deploy/              # provisionamento de Prometheus e Grafana
 docs/                # especificação OpenAPI gerada pelo swag (make swagger)
 .github/workflows/   # pipeline de CI (GitHub Actions)
 ```
+
+### Migrações de schema
+
+O schema do banco é criado por **migrações SQL versionadas** (não mais pelo
+`AutoMigrate` do GORM). Os arquivos ficam em [`migrations/`](migrations/),
+numerados (`001_create_students.sql`, ...) e separados por dialeto —
+[`postgres/`](migrations/postgres/) e [`sqlite/`](migrations/sqlite/) — porque os
+tipos divergem (ex.: `BIGSERIAL`/`TIMESTAMPTZ` no Postgres vs.
+`INTEGER AUTOINCREMENT`/`DATETIME` no SQLite).
+
+Um runner aplica as pendentes **no boot** (em `make run` e no container),
+controlando o que já rodou pela tabela `schema_migrations`; rodar de novo é
+seguro (idempotente). Para adicionar uma mudança de schema, crie o próximo par de
+arquivos numerados nas duas pastas.
 
 O cache é aplicado como um **decorator** sobre o repositório: `CachedStudentRepository`
 envolve o repositório GORM, cacheando leituras por ID e invalidando em update/delete.
