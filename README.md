@@ -1,6 +1,7 @@
 # Students API
 
 [![CI](https://github.com/apolinario0x21/effective-octo-bassoon/actions/workflows/ci.yml/badge.svg)](https://github.com/apolinario0x21/effective-octo-bassoon/actions/workflows/ci.yml)
+[![Security](https://github.com/apolinario0x21/effective-octo-bassoon/actions/workflows/security.yml/badge.svg)](https://github.com/apolinario0x21/effective-octo-bassoon/actions/workflows/security.yml)
 
 API RESTful para gerenciar estudantes, escrita em Go com [Echo](https://echo.labstack.com/)
 e [GORM](https://gorm.io/). Persistência em **PostgreSQL**, cache em **Redis** e
@@ -201,6 +202,7 @@ Exemplo de resposta de erro: `{"error": "cpf já cadastrado"}`.
 | Logs            | zerolog (JSON estruturado, com request ID)     |
 | Containers      | Docker + Docker Compose                        |
 | CI              | GitHub Actions (lint, testes, build, docker)   |
+| Segurança       | golangci-lint, govulncheck, gosec, Trivy       |
 
 ---
 
@@ -214,16 +216,31 @@ quebrar, o selo do topo do README fica vermelho. As etapas estão em
 
 | Etapa         | O que verifica                                                        |
 | ------------- | -------------------------------------------------------------------- |
-| **Lint & Vet**| Código formatado (`gofmt`), sem erros suspeitos (`go vet`) e `go.mod` em dia |
+| **Lint & Vet**| Formatação (`gofmt`), erros suspeitos (`go vet`), `golangci-lint` e `go.mod` em dia |
 | **Test**      | Roda todos os testes com detector de _race conditions_ e mede cobertura |
 | **Build**     | Garante que o binário compila                                         |
 | **Docker**    | Garante que a imagem Docker constrói                                  |
+
+Além disso, um workflow separado de **segurança**
+([`.github/workflows/security.yml`](.github/workflows/security.yml)) roda a cada
+push/PR na `main` e também semanalmente:
+
+| Etapa           | O que verifica                                                     |
+| --------------- | ----------------------------------------------------------------- |
+| **govulncheck** | Vulnerabilidades conhecidas (CVEs) nas dependências Go            |
+| **gosec**       | Padrões inseguros no código-fonte Go                             |
+| **Trivy**       | CVEs corrigíveis na imagem Docker (severidade CRITICAL/HIGH)      |
+
+As atualizações de dependências (Go, GitHub Actions e Docker) são propostas
+automaticamente pelo **Dependabot** ([`.github/dependabot.yml`](.github/dependabot.yml)),
+semanalmente e agrupadas por ecossistema.
 
 Você pode rodar as mesmas checagens no seu computador antes de enviar:
 
 ```bash
 make fmt    # formata o código
 make vet    # procura erros comuns
+make lint   # golangci-lint (mesmo conjunto do CI)
 make test   # roda os testes
 make build  # compila o binário
 ```

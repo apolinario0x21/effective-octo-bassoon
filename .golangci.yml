@@ -1,0 +1,33 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  default: none
+  enable:
+    - bodyclose      # respostas HTTP têm Body fechado
+    - errcheck       # erros retornados não podem ser ignorados
+    - govet          # análises do go vet
+    - ineffassign    # atribuições sem efeito
+    - revive         # substituto do golint (estilo)
+    - sqlclosecheck  # sql.Rows/Stmt fechados
+    - staticcheck    # inclui gosimple e unused na v2
+    - unconvert      # conversões redundantes
+    - unparam        # parâmetros/retornos não utilizados
+  settings:
+    revive:
+      rules:
+        - name: exported
+          disabled: true
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - std-error-handling
+    paths:
+      - docs         # código gerado pelo swag (Tarefa 4)
+
+formatters:
+  enable:
+    - gofmt
