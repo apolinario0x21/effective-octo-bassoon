@@ -431,3 +431,6 @@ variáveis servem para ajustar o comportamento em produção:
 - **Dashboard**: painéis de request rate, taxa de erro (5xx), latência p50/p95/p99 e
   distribuição por status code.
 - **Logs**: JSON estruturado via zerolog, com `request_id` correlacionável.
+- **Auditoria**: cada escrita em `/students` (create/update/delete) gera uma linha
+  com `audit=student`, a ação, o `student_id` e **quem fez** (`user_id` + `role`,
+  extraídos do access token), correlacionada pelo `request_id`.
