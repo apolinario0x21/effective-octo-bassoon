@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/apolinario0x21/effective-octo-bassoon/internal/models"
-	"github.com/apolinario0x21/effective-octo-bassoon/internal/repository"
+	"github.com/apolinario0x21/students-api/internal/models"
+	"github.com/apolinario0x21/students-api/internal/repository"
 )
 
 // fakeCache é um cache em memória para os testes.

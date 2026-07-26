@@ -3,7 +3,7 @@ package api
 import (
 	"time"
 
-	"github.com/apolinario0x21/effective-octo-bassoon/internal/models"
+	"github.com/apolinario0x21/students-api/internal/models"
 )
 
 // StudentResponse é a representação pública de um estudante, sem expor

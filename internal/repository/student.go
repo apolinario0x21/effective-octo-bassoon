@@ -6,7 +6,7 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/apolinario0x21/effective-octo-bassoon/internal/models"
+	"github.com/apolinario0x21/students-api/internal/models"
 )
 
 // GormStudentRepository implementa o acesso a dados de estudantes usando GORM.

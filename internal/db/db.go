@@ -9,8 +9,8 @@ import (
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
 
-	"github.com/apolinario0x21/effective-octo-bassoon/internal/config"
-	"github.com/apolinario0x21/effective-octo-bassoon/internal/models"
+	"github.com/apolinario0x21/students-api/internal/config"
+	"github.com/apolinario0x21/students-api/internal/models"
 )
 
 // Connect abre a conexão com o banco conforme o driver configurado

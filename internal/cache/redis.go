@@ -7,7 +7,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
-	"github.com/apolinario0x21/effective-octo-bassoon/internal/config"
+	"github.com/apolinario0x21/students-api/internal/config"
 )
 
 // Client é um wrapper fino sobre o cliente Redis, mantendo o TTL padrão
