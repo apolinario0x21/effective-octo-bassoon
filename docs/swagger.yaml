@@ -149,6 +149,30 @@ paths:
       summary: Autentica e emite tokens
       tags:
       - auth
+  /auth/logout:
+    post:
+      consumes:
+      - application/json
+      description: |-
+        Revoga o refresh token informado (encerra a sessão atual). É
+        idempotente: um token inexistente também devolve 204.
+      parameters:
+      - description: Refresh token a revogar
+        in: body
+        name: token
+        required: true
+        schema:
+          $ref: '#/definitions/api.refreshRequest'
+      responses:
+        "204":
+          description: sessão encerrada
+        "400":
+          description: corpo inválido
+          schema:
+            $ref: '#/definitions/api.errorResponse'
+      summary: Encerra a sessão
+      tags:
+      - auth
   /auth/refresh:
     post:
       consumes:

@@ -74,6 +74,37 @@ func TestRegisterAndLoginFlow(t *testing.T) {
 	}
 }
 
+func TestLogoutRevokesRefreshToken(t *testing.T) {
+	server := newTestServer(t)
+	doRequestNoAuth(t, server, http.MethodPost, "/auth/register", `{"username":"erin","password":"password123"}`)
+
+	rec := doRequestNoAuth(t, server, http.MethodPost, "/auth/login", `{"username":"erin","password":"password123"}`)
+	tk := decodeTokens(t, rec.Body.String())
+
+	// Logout revoga o refresh token.
+	if rec := doRequestNoAuth(t, server, http.MethodPost, "/auth/logout",
+		`{"refresh_token":"`+tk.RefreshToken+`"}`); rec.Code != http.StatusNoContent {
+		t.Fatalf("logout status = %d, want 204: %s", rec.Code, rec.Body.String())
+	}
+
+	// Após o logout, o refresh não funciona mais.
+	if rec := doRequestNoAuth(t, server, http.MethodPost, "/auth/refresh",
+		`{"refresh_token":"`+tk.RefreshToken+`"}`); rec.Code != http.StatusUnauthorized {
+		t.Errorf("refresh após logout: status = %d, want 401", rec.Code)
+	}
+
+	// Idempotente: revogar um token qualquer também devolve 204.
+	if rec := doRequestNoAuth(t, server, http.MethodPost, "/auth/logout",
+		`{"refresh_token":"inexistente"}`); rec.Code != http.StatusNoContent {
+		t.Errorf("logout idempotente: status = %d, want 204", rec.Code)
+	}
+
+	// Corpo sem refresh_token é 400.
+	if rec := doRequestNoAuth(t, server, http.MethodPost, "/auth/logout", `{}`); rec.Code != http.StatusBadRequest {
+		t.Errorf("logout sem token: status = %d, want 400", rec.Code)
+	}
+}
+
 func TestRegisterValidation(t *testing.T) {
 	server := newTestServer(t)
 

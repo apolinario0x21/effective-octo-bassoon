@@ -67,6 +67,7 @@ func (s *Server) registerRoutes() {
 	s.echo.POST("/auth/register", s.register)
 	s.echo.POST("/auth/login", s.login)
 	s.echo.POST("/auth/refresh", s.refresh)
+	s.echo.POST("/auth/logout", s.logout)
 
 	// Leitura: qualquer usuário autenticado (user ou admin).
 	read := s.echo.Group("", s.requireAuth)
