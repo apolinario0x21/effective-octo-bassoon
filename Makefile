@@ -1,4 +1,4 @@
-.PHONY: build run test vet fmt tidy clean \
+.PHONY: build run test vet fmt lint tidy clean \
         docker-build compose-up compose-down compose-logs
 
 # --- Desenvolvimento local ---------------------------------------------------
@@ -15,6 +15,11 @@ test:
 
 vet:
 	go vet ./...
+
+# Requer golangci-lint instalado (linha v2). Instalação:
+#   go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
+lint:
+	golangci-lint run ./...
 
 fmt:
 	gofmt -l -w .
