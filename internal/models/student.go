@@ -19,3 +19,18 @@ type Student struct {
 	Age    int    `gorm:"not null"`
 	Active bool   `gorm:"not null"`
 }
+
+// ListParams controla o filtro e a paginação da listagem de estudantes.
+// Active nulo significa "todos"; caso contrário, filtra por ativo/inativo.
+type ListParams struct {
+	Active *bool
+	Limit  int
+	Offset int
+}
+
+// StudentPage é uma página de estudantes acompanhada do total de registros
+// que satisfazem o filtro (ignorando limit/offset).
+type StudentPage struct {
+	Students []Student `json:"students"`
+	Total    int64     `json:"total"`
+}

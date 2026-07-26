@@ -2,6 +2,7 @@ package repository_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/apolinario0x21/effective-octo-bassoon/internal/models"
@@ -31,10 +32,13 @@ func (c *fakeCache) Delete(_ context.Context, keys ...string) error {
 	return nil
 }
 
-// countingRepo conta chamadas a FindByID para provar hits/misses de cache.
+// countingRepo conta chamadas a FindByID e List para provar hits/misses de cache.
+// List devolve dados que codificam os parâmetros recebidos, permitindo detectar
+// colisão entre páginas diferentes.
 type countingRepo struct {
 	student   models.Student
 	findCalls int
+	listCalls int
 }
 
 func (r *countingRepo) FindByID(_ context.Context, _ uint) (*models.Student, error) {
@@ -43,13 +47,18 @@ func (r *countingRepo) FindByID(_ context.Context, _ uint) (*models.Student, err
 	return &s, nil
 }
 
-func (r *countingRepo) Create(context.Context, *models.Student) error { return nil }
-func (r *countingRepo) FindAll(context.Context) ([]models.Student, error) {
-	return nil, nil
+func (r *countingRepo) List(_ context.Context, params models.ListParams) (models.StudentPage, error) {
+	r.listCalls++
+	// O nome codifica os parâmetros: assim um teste consegue provar que a página
+	// devolvida corresponde exatamente ao que foi pedido (sem colisão de cache).
+	name := fmt.Sprintf("limit=%d offset=%d", params.Limit, params.Offset)
+	return models.StudentPage{
+		Students: []models.Student{{Name: name}},
+		Total:    100,
+	}, nil
 }
-func (r *countingRepo) FindByActive(context.Context, bool) ([]models.Student, error) {
-	return nil, nil
-}
+
+func (r *countingRepo) Create(context.Context, *models.Student) error       { return nil }
 func (r *countingRepo) ExistsWithCPF(context.Context, string) (bool, error) { return false, nil }
 func (r *countingRepo) Update(context.Context, *models.Student) error       { return nil }
 func (r *countingRepo) Delete(context.Context, *models.Student) error       { return nil }
@@ -90,5 +99,98 @@ func TestCachedRepositoryInvalidatesOnUpdate(t *testing.T) {
 
 	if inner.findCalls != 2 {
 		t.Errorf("inner FindByID called %d times, want 2 (cache invalidated by update)", inner.findCalls)
+	}
+}
+
+// TestCachedRepositoryListDoesNotCollideBetweenPages é o teste que protege
+// contra a armadilha crítica: páginas com offsets diferentes NÃO podem
+// compartilhar a mesma entrada de cache.
+func TestCachedRepositoryListDoesNotCollideBetweenPages(t *testing.T) {
+	inner := &countingRepo{}
+	repo := repository.NewCachedStudentRepository(inner, newFakeCache())
+	ctx := context.Background()
+
+	page1 := models.ListParams{Limit: 10, Offset: 0}
+	page2 := models.ListParams{Limit: 10, Offset: 10}
+
+	// Primeira leitura de cada página: dois misses, dois acessos ao inner.
+	first, err := repo.List(ctx, page1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := repo.List(ctx, page2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if first.Students[0].Name == second.Students[0].Name {
+		t.Fatalf("páginas diferentes retornaram os mesmos dados: %q", first.Students[0].Name)
+	}
+	if want := "limit=10 offset=0"; first.Students[0].Name != want {
+		t.Errorf("page1 = %q, want %q", first.Students[0].Name, want)
+	}
+	if want := "limit=10 offset=10"; second.Students[0].Name != want {
+		t.Errorf("page2 = %q, want %q", second.Students[0].Name, want)
+	}
+
+	// Segunda leitura de cada página: ambas devem vir do cache (nenhum acesso
+	// novo ao inner) e ainda devolver o conteúdo correto de cada página.
+	cachedFirst, err := repo.List(ctx, page1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cachedSecond, err := repo.List(ctx, page2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if cachedFirst.Students[0].Name != first.Students[0].Name {
+		t.Errorf("page1 cacheada = %q, want %q", cachedFirst.Students[0].Name, first.Students[0].Name)
+	}
+	if cachedSecond.Students[0].Name != second.Students[0].Name {
+		t.Errorf("page2 cacheada = %q, want %q", cachedSecond.Students[0].Name, second.Students[0].Name)
+	}
+
+	if inner.listCalls != 2 {
+		t.Errorf("inner List chamado %d vezes, want 2 (uma por página distinta; demais são hits)", inner.listCalls)
+	}
+}
+
+// TestCachedRepositoryListInvalidatesOnWrite garante que qualquer escrita
+// invalida TODAS as páginas cacheadas, não apenas uma.
+func TestCachedRepositoryListInvalidatesOnWrite(t *testing.T) {
+	writes := map[string]func(repo *repository.CachedStudentRepository, ctx context.Context) error{
+		"create": func(repo *repository.CachedStudentRepository, ctx context.Context) error {
+			return repo.Create(ctx, &models.Student{})
+		},
+		"update": func(repo *repository.CachedStudentRepository, ctx context.Context) error {
+			return repo.Update(ctx, &models.Student{})
+		},
+		"delete": func(repo *repository.CachedStudentRepository, ctx context.Context) error {
+			return repo.Delete(ctx, &models.Student{})
+		},
+	}
+
+	for name, write := range writes {
+		t.Run(name, func(t *testing.T) {
+			inner := &countingRepo{}
+			repo := repository.NewCachedStudentRepository(inner, newFakeCache())
+			ctx := context.Background()
+			params := models.ListParams{Limit: 10, Offset: 0}
+
+			if _, err := repo.List(ctx, params); err != nil { // popula o cache
+				t.Fatal(err)
+			}
+			if err := write(repo, ctx); err != nil { // deve invalidar todas as páginas
+				t.Fatal(err)
+			}
+			if _, err := repo.List(ctx, params); err != nil { // volta ao banco
+				t.Fatal(err)
+			}
+
+			if inner.listCalls != 2 {
+				t.Errorf("inner List chamado %d vezes, want 2 (cache invalidado por %s)", inner.listCalls, name)
+			}
+		})
 	}
 }

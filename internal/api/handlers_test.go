@@ -2,6 +2,7 @@ package api_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -72,6 +73,48 @@ func decodeStudentList(t *testing.T, body string) []api.StudentResponse {
 	}
 
 	return response.Students
+}
+
+// pageResponse espelha o corpo paginado de GET /students.
+type pageResponse struct {
+	Students []api.StudentResponse `json:"students"`
+	Total    int64                 `json:"total"`
+	Limit    int                   `json:"limit"`
+	Offset   int                   `json:"offset"`
+}
+
+func decodePage(t *testing.T, body string) pageResponse {
+	t.Helper()
+
+	page := pageResponse{}
+	if err := json.Unmarshal([]byte(body), &page); err != nil {
+		t.Fatalf("failed to decode page %q: %v", body, err)
+	}
+
+	return page
+}
+
+// makeCPF gera um CPF válido a partir de uma base de 9 dígitos, calculando os
+// dois dígitos verificadores — permite criar muitos estudantes nos testes.
+func makeCPF(base int) string {
+	digits := make([]int, 11)
+	for i := 8; i >= 0; i-- {
+		digits[i] = base % 10
+		base /= 10
+	}
+	for _, position := range []int{9, 10} {
+		sum := 0
+		for i := 0; i < position; i++ {
+			sum += digits[i] * (position + 1 - i)
+		}
+		digits[position] = (sum * 10) % 11 % 10
+	}
+
+	var b strings.Builder
+	for _, d := range digits {
+		b.WriteByte(byte('0' + d))
+	}
+	return b.String()
 }
 
 func createMaria(t *testing.T, server *api.Server) api.StudentResponse {
@@ -164,6 +207,91 @@ func TestListStudents(t *testing.T) {
 	recorder = doRequest(t, server, http.MethodGet, "/students?active=banana", "")
 	if recorder.Code != http.StatusBadRequest {
 		t.Errorf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
+	}
+}
+
+func TestListStudentsPagination(t *testing.T) {
+	server := newTestServer(t)
+
+	const total = 5
+	for i := 0; i < total; i++ {
+		body := fmt.Sprintf(`{"name":"S%d","cpf":"%s","email":"s%d@example.com","age":20,"active":true}`,
+			i, makeCPF(100000001+i), i)
+		recorder := doRequest(t, server, http.MethodPost, "/students", body)
+		if recorder.Code != http.StatusCreated {
+			t.Fatalf("create %d: status %d, body %s", i, recorder.Code, recorder.Body.String())
+		}
+	}
+
+	// Primeira página: limit menor que o total.
+	recorder := doRequest(t, server, http.MethodGet, "/students?limit=2&offset=0", "")
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusOK)
+	}
+	page := decodePage(t, recorder.Body.String())
+	if page.Total != total {
+		t.Errorf("total = %d, want %d", page.Total, total)
+	}
+	if page.Limit != 2 || page.Offset != 0 {
+		t.Errorf("metadata = limit %d offset %d, want limit 2 offset 0", page.Limit, page.Offset)
+	}
+	if len(page.Students) != 2 {
+		t.Errorf("len(students) = %d, want 2", len(page.Students))
+	}
+	firstPageIDs := []uint{page.Students[0].ID, page.Students[1].ID}
+
+	// Segunda página: deve trazer estudantes diferentes da primeira.
+	recorder = doRequest(t, server, http.MethodGet, "/students?limit=2&offset=2", "")
+	page = decodePage(t, recorder.Body.String())
+	if len(page.Students) != 2 {
+		t.Fatalf("len(students) = %d, want 2", len(page.Students))
+	}
+	for _, id := range firstPageIDs {
+		if page.Students[0].ID == id || page.Students[1].ID == id {
+			t.Errorf("segunda página repetiu o id %d da primeira", id)
+		}
+	}
+
+	// Última página parcial: offset além do fim devolve o resto.
+	recorder = doRequest(t, server, http.MethodGet, "/students?limit=2&offset=4", "")
+	page = decodePage(t, recorder.Body.String())
+	if len(page.Students) != 1 {
+		t.Errorf("última página: len(students) = %d, want 1", len(page.Students))
+	}
+	if page.Total != total {
+		t.Errorf("última página: total = %d, want %d", page.Total, total)
+	}
+
+	// Sem params: aplica o limit padrão e devolve todos (total < padrão).
+	recorder = doRequest(t, server, http.MethodGet, "/students", "")
+	page = decodePage(t, recorder.Body.String())
+	if page.Limit != 20 {
+		t.Errorf("limit padrão = %d, want 20", page.Limit)
+	}
+	if len(page.Students) != total {
+		t.Errorf("sem paginação: len(students) = %d, want %d", len(page.Students), total)
+	}
+}
+
+func TestListStudentsInvalidPagination(t *testing.T) {
+	server := newTestServer(t)
+
+	targets := []string{
+		"/students?limit=-1",     // negativo
+		"/students?limit=0",      // abaixo do mínimo
+		"/students?limit=100000", // acima do teto
+		"/students?limit=abc",    // não numérico
+		"/students?offset=-5",    // negativo
+		"/students?offset=xyz",   // não numérico
+	}
+
+	for _, target := range targets {
+		t.Run(target, func(t *testing.T) {
+			recorder := doRequest(t, server, http.MethodGet, target, "")
+			if recorder.Code != http.StatusBadRequest {
+				t.Errorf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
+			}
+		})
 	}
 }
 
