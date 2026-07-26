@@ -49,6 +49,11 @@ func main() {
 
 	server := api.NewServer(api.Deps{Students: students, Users: users, Tokens: tokens})
 
+	// Limpeza periódica de refresh tokens expirados/revogados, encerrada no shutdown.
+	cleanupCtx, stopCleanup := context.WithCancel(context.Background())
+	defer stopCleanup()
+	startRefreshTokenCleanup(cleanupCtx, users, cfg.Auth.CleanupInterval)
+
 	go func() {
 		log.Info().Str("port", cfg.Port).Msg("Starting server")
 		if err := server.Start(":" + cfg.Port); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -61,6 +66,7 @@ func main() {
 	<-quit
 
 	log.Info().Msg("Shutting down server")
+	stopCleanup()
 
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
@@ -68,6 +74,37 @@ func main() {
 	if err := server.Shutdown(ctx); err != nil {
 		log.Fatal().Err(err).Msg("Failed to shut down server gracefully")
 	}
+}
+
+// startRefreshTokenCleanup dispara um worker que apaga periodicamente os refresh
+// tokens expirados/revogados. Para quando ctx é cancelado (graceful shutdown).
+// Um intervalo <= 0 desabilita a limpeza.
+func startRefreshTokenCleanup(ctx context.Context, users *repository.GormUserRepository, interval time.Duration) {
+	if interval <= 0 {
+		log.Info().Msg("Refresh token cleanup disabled")
+		return
+	}
+
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				removed, err := users.PurgeExpiredRefreshTokens(ctx, time.Now())
+				if err != nil {
+					log.Warn().Err(err).Msg("Failed to purge refresh tokens")
+					continue
+				}
+				if removed > 0 {
+					log.Info().Int64("removed", removed).Msg("Purged expired/revoked refresh tokens")
+				}
+			}
+		}
+	}()
 }
 
 // buildRepository monta o repositório de estudantes, decorando-o com o cache

@@ -29,9 +29,10 @@ func (c Config) IsProduction() bool {
 // (a aplicação falha no boot se estiver vazio); em desenvolvimento, quando vazio,
 // um segredo efêmero aleatório é gerado.
 type AuthConfig struct {
-	Secret     string
-	AccessTTL  time.Duration
-	RefreshTTL time.Duration
+	Secret          string
+	AccessTTL       time.Duration
+	RefreshTTL      time.Duration
+	CleanupInterval time.Duration // frequência da limpeza de refresh tokens expirados
 }
 
 // AdminSeed permite provisionar um usuário admin inicial no boot. Quando ambos os
@@ -99,9 +100,10 @@ func Load() Config {
 		LogLevel: getEnv("LOG_LEVEL", "info"),
 		AppEnv:   getEnv("APP_ENV", "development"),
 		Auth: AuthConfig{
-			Secret:     getEnv("JWT_SECRET", ""),
-			AccessTTL:  getEnvDuration("JWT_ACCESS_TTL", 15*time.Minute),
-			RefreshTTL: getEnvDuration("JWT_REFRESH_TTL", 7*24*time.Hour),
+			Secret:          getEnv("JWT_SECRET", ""),
+			AccessTTL:       getEnvDuration("JWT_ACCESS_TTL", 15*time.Minute),
+			RefreshTTL:      getEnvDuration("JWT_REFRESH_TTL", 7*24*time.Hour),
+			CleanupInterval: getEnvDuration("REFRESH_CLEANUP_INTERVAL", time.Hour),
 		},
 		Admin: AdminSeed{
 			Username: getEnv("ADMIN_USERNAME", ""),

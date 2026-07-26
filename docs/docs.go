@@ -66,6 +66,40 @@ const docTemplate = `{
                 }
             }
         },
+        "/auth/logout": {
+            "post": {
+                "description": "Revoga o refresh token informado (encerra a sessão atual). É\nidempotente: um token inexistente também devolve 204.",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Encerra a sessão",
+                "parameters": [
+                    {
+                        "description": "Refresh token a revogar",
+                        "name": "token",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.refreshRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "sessão encerrada"
+                    },
+                    "400": {
+                        "description": "corpo inválido",
+                        "schema": {
+                            "$ref": "#/definitions/api.errorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/auth/refresh": {
             "post": {
                 "description": "Troca um refresh token válido por um novo par de tokens. O refresh\nusado é revogado (rotação).",

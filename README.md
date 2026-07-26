@@ -201,6 +201,7 @@ Exemplo de resposta de erro: `{"error": "cpf já cadastrado"}`.
 | POST   | `/auth/register`        | Cria uma conta (papel `user`)        | público       | 201     |
 | POST   | `/auth/login`           | Autentica e emite tokens             | público       | 200     |
 | POST   | `/auth/refresh`         | Renova o access token                | público       | 200     |
+| POST   | `/auth/logout`          | Revoga o refresh token (encerra sessão) | público    | 204     |
 | GET    | `/students`             | Lista estudantes (paginada)          | autenticado   | 200     |
 | GET    | `/students/:id`         | Mostra um estudante                  | autenticado   | 200     |
 | POST   | `/students`             | Cria um estudante                    | **admin**     | 201     |
@@ -269,6 +270,17 @@ curl -X POST localhost:8080/auth/refresh \
   -H 'Content-Type: application/json' \
   -d '{"refresh_token":"SEU_REFRESH_TOKEN"}'
 ```
+
+**5. Para encerrar a sessão**, revogue o refresh token:
+
+```bash
+curl -X POST localhost:8080/auth/logout \
+  -H 'Content-Type: application/json' \
+  -d '{"refresh_token":"SEU_REFRESH_TOKEN"}'
+```
+
+Refresh tokens expirados ou revogados são apagados do banco periodicamente por um
+worker em background (intervalo em `REFRESH_CLEANUP_INTERVAL`, padrão `1h`).
 
 > **Papéis:** `register` sempre cria `user`. Para ter um **admin**, defina
 > `ADMIN_USERNAME` e `ADMIN_PASSWORD` no ambiente — no boot, se o usuário não existir,
@@ -394,6 +406,7 @@ variáveis servem para ajustar o comportamento em produção:
 | `JWT_SECRET`     | —           | Segredo de assinatura do JWT (obrigatório em prod) |
 | `JWT_ACCESS_TTL` | `15m`       | Validade do access token                          |
 | `JWT_REFRESH_TTL`| `168h`      | Validade do refresh token (7 dias)                |
+| `REFRESH_CLEANUP_INTERVAL` | `1h` | Limpeza de refresh tokens expirados (`0` desabilita) |
 | `ADMIN_USERNAME` | —           | Usuário admin a provisionar no boot (opcional)    |
 | `ADMIN_PASSWORD` | —           | Senha do admin a provisionar (opcional)           |
 | `DB_DRIVER`      | `postgres`  | `postgres` \| `sqlite`                            |

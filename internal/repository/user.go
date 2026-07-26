@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"time"
 
 	"gorm.io/gorm"
 
@@ -78,4 +79,15 @@ func (r *GormUserRepository) RevokeRefreshToken(ctx context.Context, tokenHash s
 		Model(&models.RefreshToken{}).
 		Where("token_hash = ?", tokenHash).
 		Update("revoked", true).Error
+}
+
+// PurgeExpiredRefreshTokens remove de vez (hard delete) os refresh tokens
+// expirados ou revogados, devolvendo quantos foram apagados. Usa Unscoped porque
+// gorm.Model faria apenas soft-delete.
+func (r *GormUserRepository) PurgeExpiredRefreshTokens(ctx context.Context, now time.Time) (int64, error) {
+	res := r.db.WithContext(ctx).
+		Unscoped().
+		Where("expires_at < ? OR revoked = ?", now, true).
+		Delete(&models.RefreshToken{})
+	return res.RowsAffected, res.Error
 }

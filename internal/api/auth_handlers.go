@@ -210,6 +210,36 @@ func (s *Server) refresh(c echo.Context) error {
 	return c.JSON(http.StatusOK, tokens)
 }
 
+// logout godoc
+//
+//	@Summary		Encerra a sessão
+//	@Description	Revoga o refresh token informado (encerra a sessão atual). É
+//	@Description	idempotente: um token inexistente também devolve 204.
+//	@Tags			auth
+//	@Accept			json
+//	@Param			token	body	refreshRequest	true	"Refresh token a revogar"
+//	@Success		204		"sessão encerrada"
+//	@Failure		400		{object}	errorResponse	"corpo inválido"
+//	@Router			/auth/logout [post]
+func (s *Server) logout(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	request := refreshRequest{}
+	if err := c.Bind(&request); err != nil {
+		return jsonError(c, http.StatusBadRequest, "invalid request body")
+	}
+	if request.RefreshToken == "" {
+		return jsonError(c, http.StatusBadRequest, "refresh_token is required")
+	}
+
+	if err := s.users.RevokeRefreshToken(ctx, auth.HashRefreshToken(request.RefreshToken)); err != nil {
+		log.Error().Err(err).Msg("[api] failed to revoke refresh token on logout")
+		return jsonError(c, http.StatusInternalServerError, "failed to logout")
+	}
+
+	return c.NoContent(http.StatusNoContent)
+}
+
 // issueTokens gera um access token e um refresh token novos, persistindo o hash
 // do refresh para permitir revogação.
 func (s *Server) issueTokens(ctx context.Context, user *models.User) (tokenResponse, error) {
