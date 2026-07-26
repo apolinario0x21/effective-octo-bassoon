@@ -137,9 +137,28 @@ Guarde esse `id` — é como o número da carteirinha do aluno.
 ### 2. Ver os alunos (GET)
 
 ```bash
-curl localhost:8080/students              # todos os alunos
-curl "localhost:8080/students?active=true"  # só os que estão ativos
-curl localhost:8080/students/1            # só o aluno de id 1
+curl localhost:8080/students                    # primeira página (20 por padrão)
+curl "localhost:8080/students?active=true"      # só os que estão ativos
+curl "localhost:8080/students?limit=10&offset=20"  # página: 10 alunos, pulando os 20 primeiros
+curl localhost:8080/students/1                  # só o aluno de id 1
+```
+
+A lista vem **paginada**. Você controla com dois parâmetros opcionais:
+
+- `limit` — quantos alunos por página (padrão `20`, máximo `100`).
+- `offset` — quantos pular antes de começar (padrão `0`).
+
+Valores inválidos (`limit` fora de `1..100`, `offset` negativo, ou não numéricos)
+retornam `400`. A resposta traz a lista e mais três campos: `total` (quantos
+alunos existem no filtro), `limit` e `offset` aplicados:
+
+```json
+{
+  "students": [ { "id": 21, "name": "Maria", "...": "..." } ],
+  "total": 137,
+  "limit": 10,
+  "offset": 20
+}
 ```
 
 ### 3. Alterar um aluno (PUT)
@@ -179,8 +198,9 @@ Exemplo de resposta de erro: `{"error": "cpf já cadastrado"}`.
 | ------ | ----------------------- | ------------------------------------ | ------- |
 | GET    | `/healthz`              | Sinal de vida (health check)         | 200     |
 | GET    | `/metrics`              | Métricas para o Prometheus           | 200     |
-| GET    | `/students`             | Lista todos os estudantes            | 200     |
-| GET    | `/students?active=true` | Lista estudantes ativos (ou `false`) | 200     |
+| GET    | `/students`             | Lista estudantes (paginada)          | 200     |
+| GET    | `/students?active=true` | Filtra por ativos (ou `false`)       | 200     |
+| GET    | `/students?limit=&offset=` | Pagina (limit 1–100, padrão 20)   | 200     |
 | POST   | `/students`             | Cria um estudante                    | 201     |
 | GET    | `/students/:id`         | Mostra um estudante                  | 200     |
 | PUT    | `/students/:id`         | Atualiza um estudante (parcial)      | 200     |

@@ -2,6 +2,7 @@ package api
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -28,31 +29,76 @@ func (s *Server) healthCheck(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 }
 
+// Limites de paginação da listagem de estudantes.
+const (
+	defaultLimit = 20  // page size padrão quando 'limit' não é informado
+	maxLimit     = 100 // teto para impedir páginas absurdamente grandes
+)
+
 func (s *Server) listStudents(c echo.Context) error {
 	ctx := c.Request().Context()
 
-	var (
-		students []models.Student
-		err      error
-	)
+	params := models.ListParams{Limit: defaultLimit}
 
 	if raw := c.QueryParam("active"); raw != "" {
-		active, parseErr := strconv.ParseBool(raw)
-		if parseErr != nil {
+		active, err := strconv.ParseBool(raw)
+		if err != nil {
 			return jsonError(c, http.StatusBadRequest, "query param 'active' must be a boolean")
 		}
-
-		students, err = s.students.FindByActive(ctx, active)
-	} else {
-		students, err = s.students.FindAll(ctx)
+		params.Active = &active
 	}
 
+	limit, offset, err := parsePagination(c)
+	if err != nil {
+		return jsonError(c, http.StatusBadRequest, err.Error())
+	}
+	params.Limit = limit
+	params.Offset = offset
+
+	page, err := s.students.List(ctx, params)
 	if err != nil {
 		log.Error().Err(err).Msg("[api] failed to list students")
 		return jsonError(c, http.StatusInternalServerError, "failed to list students")
 	}
 
-	return c.JSON(http.StatusOK, listStudentsResponse{Students: newStudentResponses(students)})
+	return c.JSON(http.StatusOK, listStudentsResponse{
+		Students: newStudentResponses(page.Students),
+		Total:    page.Total,
+		Limit:    limit,
+		Offset:   offset,
+	})
+}
+
+// parsePagination lê e valida os query params 'limit' e 'offset', aplicando
+// valores padrão e um teto máximo. Retorna erro (para 400) quando os valores
+// não são numéricos ou estão fora da faixa permitida.
+func parsePagination(c echo.Context) (limit, offset int, err error) {
+	limit = defaultLimit
+	offset = 0
+
+	if raw := c.QueryParam("limit"); raw != "" {
+		v, convErr := strconv.Atoi(raw)
+		if convErr != nil {
+			return 0, 0, fmt.Errorf("query param 'limit' must be an integer")
+		}
+		if v < 1 || v > maxLimit {
+			return 0, 0, fmt.Errorf("query param 'limit' must be between 1 and %d", maxLimit)
+		}
+		limit = v
+	}
+
+	if raw := c.QueryParam("offset"); raw != "" {
+		v, convErr := strconv.Atoi(raw)
+		if convErr != nil {
+			return 0, 0, fmt.Errorf("query param 'offset' must be an integer")
+		}
+		if v < 0 {
+			return 0, 0, fmt.Errorf("query param 'offset' must be zero or positive")
+		}
+		offset = v
+	}
+
+	return limit, offset, nil
 }
 
 func (s *Server) createStudent(c echo.Context) error {

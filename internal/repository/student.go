@@ -22,18 +22,35 @@ func (r *GormStudentRepository) Create(ctx context.Context, student *models.Stud
 	return r.db.WithContext(ctx).Create(student).Error
 }
 
-func (r *GormStudentRepository) FindAll(ctx context.Context) ([]models.Student, error) {
+// List devolve uma página de estudantes (aplicando limit/offset e o filtro
+// opcional por active) junto do total de registros que satisfazem o filtro.
+func (r *GormStudentRepository) List(ctx context.Context, params models.ListParams) (models.StudentPage, error) {
+	// filtered devolve uma query nova já com o filtro aplicado, evitando que a
+	// contagem e a busca compartilhem o mesmo statement do GORM.
+	filtered := func() *gorm.DB {
+		q := r.db.WithContext(ctx).Model(&models.Student{})
+		if params.Active != nil {
+			q = q.Where("active = ?", *params.Active)
+		}
+		return q
+	}
+
+	var total int64
+	if err := filtered().Count(&total).Error; err != nil {
+		return models.StudentPage{}, err
+	}
+
 	students := []models.Student{}
-	err := r.db.WithContext(ctx).Find(&students).Error
+	err := filtered().
+		Order("id ASC").
+		Limit(params.Limit).
+		Offset(params.Offset).
+		Find(&students).Error
+	if err != nil {
+		return models.StudentPage{}, err
+	}
 
-	return students, err
-}
-
-func (r *GormStudentRepository) FindByActive(ctx context.Context, active bool) ([]models.Student, error) {
-	students := []models.Student{}
-	err := r.db.WithContext(ctx).Where("active = ?", active).Find(&students).Error
-
-	return students, err
+	return models.StudentPage{Students: students, Total: total}, nil
 }
 
 func (r *GormStudentRepository) FindByID(ctx context.Context, id uint) (*models.Student, error) {

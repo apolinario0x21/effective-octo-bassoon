@@ -19,8 +19,13 @@ type StudentResponse struct {
 	Active    bool      `json:"active"`
 }
 
+// listStudentsResponse traz a página de estudantes e os metadados de paginação:
+// total de registros que satisfazem o filtro e o limit/offset aplicados.
 type listStudentsResponse struct {
 	Students []StudentResponse `json:"students"`
+	Total    int64             `json:"total"`
+	Limit    int               `json:"limit"`
+	Offset   int               `json:"offset"`
 }
 
 type errorResponse struct {
