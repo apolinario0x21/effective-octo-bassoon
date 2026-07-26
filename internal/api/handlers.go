@@ -25,6 +25,14 @@ func parseIDParam(c echo.Context) (uint, error) {
 	return uint(id), nil
 }
 
+// healthCheck godoc
+//
+//	@Summary		Health check
+//	@Description	Sinal de vida da aplicação.
+//	@Tags			observabilidade
+//	@Produce		json
+//	@Success		200	{object}	map[string]string	"{\"status\":\"ok\"}"
+//	@Router			/healthz [get]
 func (s *Server) healthCheck(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 }
@@ -35,6 +43,19 @@ const (
 	maxLimit     = 100 // teto para impedir páginas absurdamente grandes
 )
 
+// listStudents godoc
+//
+//	@Summary		Lista estudantes (paginada)
+//	@Description	Retorna uma página de estudantes com metadados de paginação
+//	@Description	(total, limit, offset). Aceita filtro opcional por `active`.
+//	@Tags			students
+//	@Produce		json
+//	@Param			active	query		bool	false	"Filtra por ativo (true) ou inativo (false)"
+//	@Param			limit	query		int		false	"Itens por página (1–100)"	default(20)
+//	@Param			offset	query		int		false	"Itens a pular"				default(0)
+//	@Success		200		{object}	listStudentsResponse
+//	@Failure		400		{object}	errorResponse	"parâmetro inválido"
+//	@Router			/students [get]
 func (s *Server) listStudents(c echo.Context) error {
 	ctx := c.Request().Context()
 
@@ -101,6 +122,20 @@ func parsePagination(c echo.Context) (limit, offset int, err error) {
 	return limit, offset, nil
 }
 
+// createStudent godoc
+//
+//	@Summary		Cria um estudante
+//	@Description	Cria um estudante. O CPF deve ter 11 dígitos (só números), ser
+//	@Description	válido pelos dígitos verificadores e único; o e-mail deve ter
+//	@Description	formato válido. `active` é obrigatório.
+//	@Tags			students
+//	@Accept			json
+//	@Produce		json
+//	@Param			student	body		CreateStudentRequest	true	"Dados do estudante"
+//	@Success		201		{object}	StudentResponse
+//	@Failure		400		{object}	errorResponse	"corpo/validação inválidos"
+//	@Failure		409		{object}	errorResponse	"CPF já cadastrado"
+//	@Router			/students [post]
 func (s *Server) createStudent(c echo.Context) error {
 	ctx := c.Request().Context()
 
@@ -138,6 +173,16 @@ func (s *Server) createStudent(c echo.Context) error {
 	return c.JSON(http.StatusCreated, newStudentResponse(student))
 }
 
+// getStudent godoc
+//
+//	@Summary		Busca um estudante por ID
+//	@Tags			students
+//	@Produce		json
+//	@Param			id	path		int	true	"ID do estudante"
+//	@Success		200	{object}	StudentResponse
+//	@Failure		400	{object}	errorResponse	"ID inválido"
+//	@Failure		404	{object}	errorResponse	"não encontrado"
+//	@Router			/students/{id} [get]
 func (s *Server) getStudent(c echo.Context) error {
 	id, err := parseIDParam(c)
 	if err != nil {
@@ -156,6 +201,21 @@ func (s *Server) getStudent(c echo.Context) error {
 	return c.JSON(http.StatusOK, newStudentResponse(*student))
 }
 
+// updateStudent godoc
+//
+//	@Summary		Atualiza um estudante (parcial)
+//	@Description	Atualização parcial: apenas os campos enviados são alterados.
+//	@Description	As mesmas regras de validação de CPF e e-mail se aplicam.
+//	@Tags			students
+//	@Accept			json
+//	@Produce		json
+//	@Param			id		path		int						true	"ID do estudante"
+//	@Param			student	body		UpdateStudentRequest	true	"Campos a atualizar"
+//	@Success		200		{object}	StudentResponse
+//	@Failure		400		{object}	errorResponse	"corpo/validação inválidos"
+//	@Failure		404		{object}	errorResponse	"não encontrado"
+//	@Failure		409		{object}	errorResponse	"CPF já cadastrado"
+//	@Router			/students/{id} [put]
 func (s *Server) updateStudent(c echo.Context) error {
 	ctx := c.Request().Context()
 
@@ -203,6 +263,15 @@ func (s *Server) updateStudent(c echo.Context) error {
 	return c.JSON(http.StatusOK, newStudentResponse(*student))
 }
 
+// deleteStudent godoc
+//
+//	@Summary		Remove um estudante
+//	@Tags			students
+//	@Param			id	path	int	true	"ID do estudante"
+//	@Success		204	"sem conteúdo"
+//	@Failure		400	{object}	errorResponse	"ID inválido"
+//	@Failure		404	{object}	errorResponse	"não encontrado"
+//	@Router			/students/{id} [delete]
 func (s *Server) deleteStudent(c echo.Context) error {
 	ctx := c.Request().Context()
 

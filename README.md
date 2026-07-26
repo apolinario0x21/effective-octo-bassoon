@@ -208,6 +208,27 @@ Exemplo de resposta de erro: `{"error": "cpf já cadastrado"}`.
 
 ---
 
+## 📖 Documentação interativa (Swagger)
+
+Com a aplicação rodando, abra no navegador:
+
+```
+http://localhost:8080/swagger/index.html
+```
+
+É uma página onde você **vê todas as rotas, os campos de cada uma e pode testá-las
+clicando em "Try it out"** — sem precisar decorar comandos `curl`. A especificação
+OpenAPI crua fica em `/swagger/doc.json`.
+
+A documentação é **gerada a partir de comentários** nos handlers (`internal/api/`) e
+versionada em [`docs/`](docs/). Se você mudar uma rota, regenere com:
+
+```bash
+make swagger   # requer: go install github.com/swaggo/swag/cmd/swag@latest
+```
+
+---
+
 ## 🧰 Stack (as ferramentas usadas)
 
 | Camada          | Tecnologia                                     |
@@ -220,6 +241,7 @@ Exemplo de resposta de erro: `{"error": "cpf já cadastrado"}`.
 | Métricas        | Prometheus (`/metrics` via echo-prometheus)    |
 | Dashboards      | Grafana (datasource e dashboard provisionados) |
 | Logs            | zerolog (JSON estruturado, com request ID)     |
+| Docs da API     | OpenAPI/Swagger (swaggo + echo-swagger)        |
 | Containers      | Docker + Docker Compose                        |
 | CI              | GitHub Actions (lint, testes, build, docker)   |
 | Segurança       | golangci-lint, govulncheck, gosec, Trivy       |
@@ -278,6 +300,7 @@ internal/db/         # conexão (postgres/sqlite), pool e migrações
 internal/models/     # entidades de domínio
 internal/repository/ # acesso a dados (GORM) + decorator de cache (Redis)
 deploy/              # provisionamento de Prometheus e Grafana
+docs/                # especificação OpenAPI gerada pelo swag (make swagger)
 .github/workflows/   # pipeline de CI (GitHub Actions)
 ```
 
