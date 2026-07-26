@@ -47,15 +47,30 @@ func NewServer(students StudentRepository) *Server {
 
 func (s *Server) registerRoutes() {
 	s.echo.GET("/healthz", s.healthCheck)
-	s.echo.GET("/metrics", echoprometheus.NewHandlerWithConfig(echoprometheus.HandlerConfig{
-		Gatherer: s.registry,
-	}))
+	s.echo.GET("/metrics", s.metrics())
 
 	s.echo.GET("/students", s.listStudents)
 	s.echo.POST("/students", s.createStudent)
 	s.echo.GET("/students/:id", s.getStudent)
 	s.echo.PUT("/students/:id", s.updateStudent)
 	s.echo.DELETE("/students/:id", s.deleteStudent)
+
+	registerSwagger(s.echo)
+}
+
+// metrics devolve o handler das métricas Prometheus.
+//
+//	@Summary		Métricas Prometheus
+//	@Description	Expõe contadores e histogramas por rota/método/status no formato
+//	@Description	de texto do Prometheus.
+//	@Tags			observabilidade
+//	@Produce		plain
+//	@Success		200	{string}	string	"Métricas no formato Prometheus"
+//	@Router			/metrics [get]
+func (s *Server) metrics() echo.HandlerFunc {
+	return echoprometheus.NewHandlerWithConfig(echoprometheus.HandlerConfig{
+		Gatherer: s.registry,
+	})
 }
 
 func (s *Server) Start(address string) error {

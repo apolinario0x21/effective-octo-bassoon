@@ -1,0 +1,269 @@
+basePath: /
+definitions:
+  api.CreateStudentRequest:
+    properties:
+      active:
+        description: ponteiro para diferenciar "false" de "campo ausente"
+        type: boolean
+      age:
+        type: integer
+      cpf:
+        type: string
+      email:
+        type: string
+      name:
+        type: string
+    type: object
+  api.StudentResponse:
+    properties:
+      active:
+        type: boolean
+      age:
+        type: integer
+      cpf:
+        type: string
+      createdAt:
+        type: string
+      email:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  api.UpdateStudentRequest:
+    properties:
+      active:
+        type: boolean
+      age:
+        type: integer
+      cpf:
+        type: string
+      email:
+        type: string
+      name:
+        type: string
+    type: object
+  api.errorResponse:
+    properties:
+      error:
+        type: string
+    type: object
+  api.listStudentsResponse:
+    properties:
+      limit:
+        type: integer
+      offset:
+        type: integer
+      students:
+        items:
+          $ref: '#/definitions/api.StudentResponse'
+        type: array
+      total:
+        type: integer
+    type: object
+info:
+  contact:
+    name: Students API
+  description: |-
+    API RESTful para gerenciar estudantes (CRUD), com validação de
+    CPF (dígitos verificadores + unicidade) e e-mail, listagem
+    paginada, cache e observabilidade.
+
+    Erros são retornados como JSON no formato `{"error": "mensagem"}`
+    com o status HTTP adequado (400 inválido, 404 não encontrado,
+    409 CPF duplicado).
+  license:
+    name: MIT
+  title: Students API
+  version: "1.0"
+paths:
+  /healthz:
+    get:
+      description: Sinal de vida da aplicação.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{\"status\":\"ok\"}'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Health check
+      tags:
+      - observabilidade
+  /metrics:
+    get:
+      description: |-
+        Expõe contadores e histogramas por rota/método/status no formato
+        de texto do Prometheus.
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: Métricas no formato Prometheus
+          schema:
+            type: string
+      summary: Métricas Prometheus
+      tags:
+      - observabilidade
+  /students:
+    get:
+      description: |-
+        Retorna uma página de estudantes com metadados de paginação
+        (total, limit, offset). Aceita filtro opcional por `active`.
+      parameters:
+      - description: Filtra por ativo (true) ou inativo (false)
+        in: query
+        name: active
+        type: boolean
+      - default: 20
+        description: Itens por página (1–100)
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Itens a pular
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.listStudentsResponse'
+        "400":
+          description: parâmetro inválido
+          schema:
+            $ref: '#/definitions/api.errorResponse'
+      summary: Lista estudantes (paginada)
+      tags:
+      - students
+    post:
+      consumes:
+      - application/json
+      description: |-
+        Cria um estudante. O CPF deve ter 11 dígitos (só números), ser
+        válido pelos dígitos verificadores e único; o e-mail deve ter
+        formato válido. `active` é obrigatório.
+      parameters:
+      - description: Dados do estudante
+        in: body
+        name: student
+        required: true
+        schema:
+          $ref: '#/definitions/api.CreateStudentRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/api.StudentResponse'
+        "400":
+          description: corpo/validação inválidos
+          schema:
+            $ref: '#/definitions/api.errorResponse'
+        "409":
+          description: CPF já cadastrado
+          schema:
+            $ref: '#/definitions/api.errorResponse'
+      summary: Cria um estudante
+      tags:
+      - students
+  /students/{id}:
+    delete:
+      parameters:
+      - description: ID do estudante
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: sem conteúdo
+        "400":
+          description: ID inválido
+          schema:
+            $ref: '#/definitions/api.errorResponse'
+        "404":
+          description: não encontrado
+          schema:
+            $ref: '#/definitions/api.errorResponse'
+      summary: Remove um estudante
+      tags:
+      - students
+    get:
+      parameters:
+      - description: ID do estudante
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.StudentResponse'
+        "400":
+          description: ID inválido
+          schema:
+            $ref: '#/definitions/api.errorResponse'
+        "404":
+          description: não encontrado
+          schema:
+            $ref: '#/definitions/api.errorResponse'
+      summary: Busca um estudante por ID
+      tags:
+      - students
+    put:
+      consumes:
+      - application/json
+      description: |-
+        Atualização parcial: apenas os campos enviados são alterados.
+        As mesmas regras de validação de CPF e e-mail se aplicam.
+      parameters:
+      - description: ID do estudante
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Campos a atualizar
+        in: body
+        name: student
+        required: true
+        schema:
+          $ref: '#/definitions/api.UpdateStudentRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.StudentResponse'
+        "400":
+          description: corpo/validação inválidos
+          schema:
+            $ref: '#/definitions/api.errorResponse'
+        "404":
+          description: não encontrado
+          schema:
+            $ref: '#/definitions/api.errorResponse'
+        "409":
+          description: CPF já cadastrado
+          schema:
+            $ref: '#/definitions/api.errorResponse'
+      summary: Atualiza um estudante (parcial)
+      tags:
+      - students
+schemes:
+- http
+- https
+swagger: "2.0"
