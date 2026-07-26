@@ -175,6 +175,7 @@ func (s *Server) createStudent(c echo.Context) error {
 		return jsonError(c, http.StatusInternalServerError, "failed to create student")
 	}
 
+	s.auditWrite(c, "create", student.ID)
 	return c.JSON(http.StatusCreated, newStudentResponse(student))
 }
 
@@ -270,6 +271,7 @@ func (s *Server) updateStudent(c echo.Context) error {
 		return jsonError(c, http.StatusInternalServerError, "failed to update student")
 	}
 
+	s.auditWrite(c, "update", student.ID)
 	return c.JSON(http.StatusOK, newStudentResponse(*student))
 }
 
@@ -307,6 +309,7 @@ func (s *Server) deleteStudent(c echo.Context) error {
 		return jsonError(c, http.StatusInternalServerError, "failed to delete student")
 	}
 
+	s.auditWrite(c, "delete", id)
 	return c.NoContent(http.StatusNoContent)
 }
 
