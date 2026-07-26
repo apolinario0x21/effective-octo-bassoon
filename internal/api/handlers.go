@@ -55,6 +55,8 @@ const (
 //	@Param			offset	query		int		false	"Itens a pular"				default(0)
 //	@Success		200		{object}	listStudentsResponse
 //	@Failure		400		{object}	errorResponse	"parâmetro inválido"
+//	@Failure		401		{object}	errorResponse	"não autenticado"
+//	@Security		BearerAuth
 //	@Router			/students [get]
 func (s *Server) listStudents(c echo.Context) error {
 	ctx := c.Request().Context()
@@ -134,7 +136,10 @@ func parsePagination(c echo.Context) (limit, offset int, err error) {
 //	@Param			student	body		CreateStudentRequest	true	"Dados do estudante"
 //	@Success		201		{object}	StudentResponse
 //	@Failure		400		{object}	errorResponse	"corpo/validação inválidos"
+//	@Failure		401		{object}	errorResponse	"não autenticado"
+//	@Failure		403		{object}	errorResponse	"requer papel admin"
 //	@Failure		409		{object}	errorResponse	"CPF já cadastrado"
+//	@Security		BearerAuth
 //	@Router			/students [post]
 func (s *Server) createStudent(c echo.Context) error {
 	ctx := c.Request().Context()
@@ -181,7 +186,9 @@ func (s *Server) createStudent(c echo.Context) error {
 //	@Param			id	path		int	true	"ID do estudante"
 //	@Success		200	{object}	StudentResponse
 //	@Failure		400	{object}	errorResponse	"ID inválido"
+//	@Failure		401	{object}	errorResponse	"não autenticado"
 //	@Failure		404	{object}	errorResponse	"não encontrado"
+//	@Security		BearerAuth
 //	@Router			/students/{id} [get]
 func (s *Server) getStudent(c echo.Context) error {
 	id, err := parseIDParam(c)
@@ -213,8 +220,11 @@ func (s *Server) getStudent(c echo.Context) error {
 //	@Param			student	body		UpdateStudentRequest	true	"Campos a atualizar"
 //	@Success		200		{object}	StudentResponse
 //	@Failure		400		{object}	errorResponse	"corpo/validação inválidos"
+//	@Failure		401		{object}	errorResponse	"não autenticado"
+//	@Failure		403		{object}	errorResponse	"requer papel admin"
 //	@Failure		404		{object}	errorResponse	"não encontrado"
 //	@Failure		409		{object}	errorResponse	"CPF já cadastrado"
+//	@Security		BearerAuth
 //	@Router			/students/{id} [put]
 func (s *Server) updateStudent(c echo.Context) error {
 	ctx := c.Request().Context()
@@ -270,7 +280,10 @@ func (s *Server) updateStudent(c echo.Context) error {
 //	@Param			id	path	int	true	"ID do estudante"
 //	@Success		204	"sem conteúdo"
 //	@Failure		400	{object}	errorResponse	"ID inválido"
+//	@Failure		401	{object}	errorResponse	"não autenticado"
+//	@Failure		403	{object}	errorResponse	"requer papel admin"
 //	@Failure		404	{object}	errorResponse	"não encontrado"
+//	@Security		BearerAuth
 //	@Router			/students/{id} [delete]
 func (s *Server) deleteStudent(c echo.Context) error {
 	ctx := c.Request().Context()

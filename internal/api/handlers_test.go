@@ -8,10 +8,12 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/labstack/echo/v4"
 
 	"github.com/apolinario0x21/students-api/internal/api"
+	"github.com/apolinario0x21/students-api/internal/auth"
 	"github.com/apolinario0x21/students-api/internal/config"
 	"github.com/apolinario0x21/students-api/internal/db"
 	"github.com/apolinario0x21/students-api/internal/repository"
@@ -23,7 +25,15 @@ const (
 	cpfJoao  = "15350946056"
 )
 
-func newTestServer(t *testing.T) *api.Server {
+// testServer agrupa o servidor e as dependências de auth para que os testes
+// consigam emitir tokens válidos.
+type testServer struct {
+	*api.Server
+	tokens *auth.Manager
+	users  *repository.GormUserRepository
+}
+
+func newTestServer(t *testing.T) *testServer {
 	t.Helper()
 
 	database, err := db.Connect(config.DBConfig{
@@ -34,21 +44,58 @@ func newTestServer(t *testing.T) *api.Server {
 		t.Fatalf("failed to connect to test database: %v", err)
 	}
 
-	return api.NewServer(repository.NewStudentRepository(database))
+	tokens := auth.NewManager("test-secret", 15*time.Minute, time.Hour)
+	users := repository.NewUserRepository(database)
+	server := api.NewServer(api.Deps{
+		Students: repository.NewStudentRepository(database),
+		Users:    users,
+		Tokens:   tokens,
+	})
+
+	return &testServer{Server: server, tokens: tokens, users: users}
 }
 
-func doRequest(t *testing.T, server *api.Server, method, target, body string) *httptest.ResponseRecorder {
+// token emite um access token para o papel informado. requireAuth só valida a
+// assinatura e lê o papel das claims, então não é preciso criar o usuário.
+func (ts *testServer) token(t *testing.T, role string) string {
+	t.Helper()
+
+	tok, err := ts.tokens.GenerateAccessToken(1, role)
+	if err != nil {
+		t.Fatalf("failed to generate token: %v", err)
+	}
+	return tok
+}
+
+// doRequest faz uma requisição autenticada como admin (autorizado em todas as
+// rotas), que é o padrão para os testes de CRUD.
+func doRequest(t *testing.T, server *testServer, method, target, body string) *httptest.ResponseRecorder {
+	t.Helper()
+	return doRequestToken(t, server, method, target, body, server.token(t, "admin"))
+}
+
+// doRequestToken faz a requisição com um Bearer token específico.
+func doRequestToken(t *testing.T, server *testServer, method, target, body, token string) *httptest.ResponseRecorder {
 	t.Helper()
 
 	request := httptest.NewRequest(method, target, strings.NewReader(body))
 	if body != "" {
 		request.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	}
+	if token != "" {
+		request.Header.Set(echo.HeaderAuthorization, "Bearer "+token)
+	}
 
 	recorder := httptest.NewRecorder()
 	server.ServeHTTP(recorder, request)
 
 	return recorder
+}
+
+// doRequestNoAuth faz a requisição sem cabeçalho Authorization.
+func doRequestNoAuth(t *testing.T, server *testServer, method, target, body string) *httptest.ResponseRecorder {
+	t.Helper()
+	return doRequestToken(t, server, method, target, body, "")
 }
 
 func decodeStudent(t *testing.T, body string) api.StudentResponse {
@@ -117,7 +164,7 @@ func makeCPF(base int) string {
 	return b.String()
 }
 
-func createMaria(t *testing.T, server *api.Server) api.StudentResponse {
+func createMaria(t *testing.T, server *testServer) api.StudentResponse {
 	t.Helper()
 
 	recorder := doRequest(t, server, http.MethodPost, "/students",

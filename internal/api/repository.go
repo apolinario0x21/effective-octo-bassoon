@@ -16,3 +16,14 @@ type StudentRepository interface {
 	Update(ctx context.Context, student *models.Student) error
 	Delete(ctx context.Context, student *models.Student) error
 }
+
+// UserRepository abstrai o acesso a dados de usuários e refresh tokens.
+type UserRepository interface {
+	CreateUser(ctx context.Context, user *models.User) error
+	FindUserByUsername(ctx context.Context, username string) (*models.User, error)
+	FindUserByID(ctx context.Context, id uint) (*models.User, error)
+	ExistsUserWithUsername(ctx context.Context, username string) (bool, error)
+	SaveRefreshToken(ctx context.Context, token *models.RefreshToken) error
+	FindRefreshToken(ctx context.Context, tokenHash string) (*models.RefreshToken, error)
+	RevokeRefreshToken(ctx context.Context, tokenHash string) error
+}

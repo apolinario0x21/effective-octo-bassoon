@@ -194,17 +194,22 @@ Exemplo de resposta de erro: `{"error": "cpf já cadastrado"}`.
 
 ## 📋 Referência das rotas
 
-| Método | Rota                    | Descrição                            | Sucesso |
-| ------ | ----------------------- | ------------------------------------ | ------- |
-| GET    | `/healthz`              | Sinal de vida (health check)         | 200     |
-| GET    | `/metrics`              | Métricas para o Prometheus           | 200     |
-| GET    | `/students`             | Lista estudantes (paginada)          | 200     |
-| GET    | `/students?active=true` | Filtra por ativos (ou `false`)       | 200     |
-| GET    | `/students?limit=&offset=` | Pagina (limit 1–100, padrão 20)   | 200     |
-| POST   | `/students`             | Cria um estudante                    | 201     |
-| GET    | `/students/:id`         | Mostra um estudante                  | 200     |
-| PUT    | `/students/:id`         | Atualiza um estudante (parcial)      | 200     |
-| DELETE | `/students/:id`         | Remove um estudante                  | 204     |
+| Método | Rota                    | Descrição                            | Acesso        | Sucesso |
+| ------ | ----------------------- | ------------------------------------ | ------------- | ------- |
+| GET    | `/healthz`              | Sinal de vida (health check)         | público       | 200     |
+| GET    | `/metrics`              | Métricas para o Prometheus           | público       | 200     |
+| POST   | `/auth/register`        | Cria uma conta (papel `user`)        | público       | 201     |
+| POST   | `/auth/login`           | Autentica e emite tokens             | público       | 200     |
+| POST   | `/auth/refresh`         | Renova o access token                | público       | 200     |
+| GET    | `/students`             | Lista estudantes (paginada)          | autenticado   | 200     |
+| GET    | `/students/:id`         | Mostra um estudante                  | autenticado   | 200     |
+| POST   | `/students`             | Cria um estudante                    | **admin**     | 201     |
+| PUT    | `/students/:id`         | Atualiza um estudante (parcial)      | **admin**     | 200     |
+| DELETE | `/students/:id`         | Remove um estudante                  | **admin**     | 204     |
+
+Rotas **autenticadas** exigem o cabeçalho `Authorization: Bearer <access_token>`
+(401 sem token válido). As de **admin** exigem, além disso, o papel admin (403 caso
+contrário).
 
 ---
 
@@ -229,6 +234,53 @@ make swagger   # requer: go install github.com/swaggo/swag/cmd/swag@latest
 
 ---
 
+## 🔐 Autenticação (JWT + papéis)
+
+A API usa **JWT** com dois papéis: `user` (só lê) e `admin` (lê e escreve). O fluxo:
+
+**1. Crie uma conta** (nasce como `user`):
+
+```bash
+curl -X POST localhost:8080/auth/register \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"maria","password":"password123"}'
+```
+
+**2. Faça login** para receber os tokens:
+
+```bash
+curl -X POST localhost:8080/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"maria","password":"password123"}'
+# → {"access_token":"...","refresh_token":"...","token_type":"Bearer"}
+```
+
+**3. Use o access token** nas rotas protegidas:
+
+```bash
+curl localhost:8080/students -H 'Authorization: Bearer SEU_ACCESS_TOKEN'
+```
+
+**4. Quando o access token expirar** (15 min), troque o refresh token por um novo par
+(o refresh usado é revogado):
+
+```bash
+curl -X POST localhost:8080/auth/refresh \
+  -H 'Content-Type: application/json' \
+  -d '{"refresh_token":"SEU_REFRESH_TOKEN"}'
+```
+
+> **Papéis:** `register` sempre cria `user`. Para ter um **admin**, defina
+> `ADMIN_USERNAME` e `ADMIN_PASSWORD` no ambiente — no boot, se o usuário não existir,
+> ele é criado como admin. As senhas são guardadas apenas como **hash bcrypt**, nunca em
+> texto puro, e não aparecem em respostas nem em logs.
+>
+> **Segredo do JWT:** `JWT_SECRET` nunca é hardcoded. Em produção
+> (`APP_ENV=production`) é obrigatório e a API não sobe sem ele; em desenvolvimento,
+> se vazio, um segredo efêmero é gerado no boot.
+
+---
+
 ## 🧰 Stack (as ferramentas usadas)
 
 | Camada          | Tecnologia                                     |
@@ -237,6 +289,7 @@ make swagger   # requer: go install github.com/swaggo/swag/cmd/swag@latest
 | Framework HTTP  | Echo v4                                         |
 | ORM             | GORM                                           |
 | Banco           | PostgreSQL 16 (SQLite pure-Go em dev/testes)   |
+| Autenticação    | JWT (golang-jwt) + RBAC + bcrypt               |
 | Cache           | Redis 7                                        |
 | Métricas        | Prometheus (`/metrics` via echo-prometheus)    |
 | Dashboards      | Grafana (datasource e dashboard provisionados) |
@@ -292,8 +345,10 @@ make build  # compila o binário
 ## 🏛️ Arquitetura
 
 ```
-cmd/api/             # entrypoint: config, wiring (DB + cache) e graceful shutdown
-internal/api/        # camada HTTP: servidor, rotas, handlers, DTOs, validação, métricas
+cmd/api/             # entrypoint: config, wiring (DB + cache + auth) e graceful shutdown
+internal/api/        # camada HTTP: servidor, rotas, handlers, DTOs, validação, auth middleware
+internal/auth/       # emissão/validação de JWT e refresh tokens
+internal/crypto/     # hashing de senha (bcrypt)
 internal/cache/      # cliente Redis
 internal/config/     # configuração via variáveis de ambiente
 internal/db/         # conexão (postgres/sqlite) e pool
@@ -335,6 +390,12 @@ variáveis servem para ajustar o comportamento em produção:
 | ---------------- | ----------- | ------------------------------------------------ |
 | `PORT`           | `8080`      | Porta HTTP                                        |
 | `LOG_LEVEL`      | `info`      | `debug` \| `info` \| `warn` \| `error`            |
+| `APP_ENV`        | `development` | `development` \| `production`                   |
+| `JWT_SECRET`     | —           | Segredo de assinatura do JWT (obrigatório em prod) |
+| `JWT_ACCESS_TTL` | `15m`       | Validade do access token                          |
+| `JWT_REFRESH_TTL`| `168h`      | Validade do refresh token (7 dias)                |
+| `ADMIN_USERNAME` | —           | Usuário admin a provisionar no boot (opcional)    |
+| `ADMIN_PASSWORD` | —           | Senha do admin a provisionar (opcional)           |
 | `DB_DRIVER`      | `postgres`  | `postgres` \| `sqlite`                            |
 | `DB_HOST`        | `localhost` | Host do PostgreSQL                                |
 | `DB_PORT`        | `5432`      | Porta do PostgreSQL                               |

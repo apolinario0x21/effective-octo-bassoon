@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"net/http"
 	"os"
@@ -14,9 +16,12 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/apolinario0x21/students-api/internal/api"
+	"github.com/apolinario0x21/students-api/internal/auth"
 	"github.com/apolinario0x21/students-api/internal/cache"
 	"github.com/apolinario0x21/students-api/internal/config"
+	"github.com/apolinario0x21/students-api/internal/crypto"
 	"github.com/apolinario0x21/students-api/internal/db"
+	"github.com/apolinario0x21/students-api/internal/models"
 	"github.com/apolinario0x21/students-api/internal/repository"
 )
 
@@ -33,7 +38,16 @@ func main() {
 	log.Info().Str("driver", cfg.DB.Driver).Msg("Connected to database")
 
 	students := buildRepository(database, cfg.Redis)
-	server := api.NewServer(students)
+	users := repository.NewUserRepository(database)
+
+	secret := resolveJWTSecret(cfg)
+	tokens := auth.NewManager(secret, cfg.Auth.AccessTTL, cfg.Auth.RefreshTTL)
+
+	if cfg.Admin.Enabled() {
+		seedAdmin(context.Background(), users, cfg.Admin)
+	}
+
+	server := api.NewServer(api.Deps{Students: students, Users: users, Tokens: tokens})
 
 	go func() {
 		log.Info().Str("port", cfg.Port).Msg("Starting server")
@@ -75,6 +89,54 @@ func buildRepository(database *gorm.DB, redisCfg config.RedisConfig) api.Student
 
 	log.Info().Str("addr", redisCfg.Addr).Msg("Redis cache enabled")
 	return repository.NewCachedStudentRepository(base, redisClient)
+}
+
+// resolveJWTSecret devolve o segredo de assinatura dos JWTs. Em produção ele é
+// obrigatório (a aplicação falha no boot se estiver vazio, para nunca rodar com
+// segredo hardcoded). Em desenvolvimento, se vazio, gera um segredo efêmero
+// aleatório (os tokens não sobrevivem a um restart — aceitável em dev).
+func resolveJWTSecret(cfg config.Config) string {
+	if cfg.Auth.Secret != "" {
+		return cfg.Auth.Secret
+	}
+
+	if cfg.IsProduction() {
+		log.Fatal().Msg("JWT_SECRET is required in production")
+	}
+
+	buf := make([]byte, 32)
+	if _, err := rand.Read(buf); err != nil {
+		log.Fatal().Err(err).Msg("Failed to generate ephemeral JWT secret")
+	}
+	log.Warn().Msg("JWT_SECRET not set; generated an ephemeral secret (tokens will not survive a restart)")
+	return hex.EncodeToString(buf)
+}
+
+// seedAdmin cria um usuário admin inicial caso ainda não exista, a partir das
+// credenciais em ADMIN_USERNAME/ADMIN_PASSWORD. Falhas são apenas logadas: não
+// devem impedir o servidor de subir.
+func seedAdmin(ctx context.Context, users *repository.GormUserRepository, seed config.AdminSeed) {
+	exists, err := users.ExistsUserWithUsername(ctx, seed.Username)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to check admin user; skipping seed")
+		return
+	}
+	if exists {
+		return
+	}
+
+	hash, err := crypto.HashPassword(seed.Password)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to hash admin password; skipping seed")
+		return
+	}
+
+	admin := models.User{Username: seed.Username, PasswordHash: hash, Role: models.RoleAdmin}
+	if err := users.CreateUser(ctx, &admin); err != nil {
+		log.Error().Err(err).Msg("Failed to create admin user")
+		return
+	}
+	log.Info().Str("username", seed.Username).Msg("Seeded admin user")
 }
 
 func configureLogging(level string) {
