@@ -9,16 +9,27 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog/log"
+
+	"github.com/apolinario0x21/students-api/internal/auth"
 )
 
 // Server encapsula o Echo e as dependências dos handlers.
 type Server struct {
 	echo     *echo.Echo
 	students StudentRepository
+	users    UserRepository
+	tokens   *auth.Manager
 	registry *prometheus.Registry
 }
 
-func NewServer(students StudentRepository) *Server {
+// Deps agrupa as dependências injetadas no servidor.
+type Deps struct {
+	Students StudentRepository
+	Users    UserRepository
+	Tokens   *auth.Manager
+}
+
+func NewServer(deps Deps) *Server {
 	e := echo.New()
 	e.HideBanner = true
 
@@ -37,7 +48,9 @@ func NewServer(students StudentRepository) *Server {
 
 	server := &Server{
 		echo:     e,
-		students: students,
+		students: deps.Students,
+		users:    deps.Users,
+		tokens:   deps.Tokens,
 		registry: registry,
 	}
 	server.registerRoutes()
@@ -46,16 +59,25 @@ func NewServer(students StudentRepository) *Server {
 }
 
 func (s *Server) registerRoutes() {
+	// Rotas abertas (sem token): observabilidade, docs e autenticação.
 	s.echo.GET("/healthz", s.healthCheck)
 	s.echo.GET("/metrics", s.metrics())
-
-	s.echo.GET("/students", s.listStudents)
-	s.echo.POST("/students", s.createStudent)
-	s.echo.GET("/students/:id", s.getStudent)
-	s.echo.PUT("/students/:id", s.updateStudent)
-	s.echo.DELETE("/students/:id", s.deleteStudent)
-
 	registerSwagger(s.echo)
+
+	s.echo.POST("/auth/register", s.register)
+	s.echo.POST("/auth/login", s.login)
+	s.echo.POST("/auth/refresh", s.refresh)
+
+	// Leitura: qualquer usuário autenticado (user ou admin).
+	read := s.echo.Group("", s.requireAuth)
+	read.GET("/students", s.listStudents)
+	read.GET("/students/:id", s.getStudent)
+
+	// Escrita: apenas admin.
+	write := s.echo.Group("", s.requireAuth, s.requireAdmin)
+	write.POST("/students", s.createStudent)
+	write.PUT("/students/:id", s.updateStudent)
+	write.DELETE("/students/:id", s.deleteStudent)
 }
 
 // metrics devolve o handler das métricas Prometheus.

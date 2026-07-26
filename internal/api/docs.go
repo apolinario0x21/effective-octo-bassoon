@@ -15,6 +15,11 @@ package api
 //	@license.name	MIT
 //	@BasePath		/
 //	@schemes		http https
+//
+//	@securityDefinitions.apikey	BearerAuth
+//	@in							header
+//	@name						Authorization
+//	@description				Autentique em /auth/login e envie: "Bearer <access_token>".
 
 import (
 	"github.com/labstack/echo/v4"

@@ -20,6 +20,144 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/auth/login": {
+            "post": {
+                "description": "Valida as credenciais e devolve um access token (JWT, curto) e um\nrefresh token (longo).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Autentica e emite tokens",
+                "parameters": [
+                    {
+                        "description": "Usuário e senha",
+                        "name": "credentials",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.loginRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.tokenResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "corpo inválido",
+                        "schema": {
+                            "$ref": "#/definitions/api.errorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "credenciais inválidas",
+                        "schema": {
+                            "$ref": "#/definitions/api.errorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/refresh": {
+            "post": {
+                "description": "Troca um refresh token válido por um novo par de tokens. O refresh\nusado é revogado (rotação).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Renova o access token",
+                "parameters": [
+                    {
+                        "description": "Refresh token",
+                        "name": "token",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.refreshRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.tokenResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "corpo inválido",
+                        "schema": {
+                            "$ref": "#/definitions/api.errorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "refresh token inválido ou expirado",
+                        "schema": {
+                            "$ref": "#/definitions/api.errorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/register": {
+            "post": {
+                "description": "Cria uma conta com papel ` + "`" + `user` + "`" + `. A senha é armazenada apenas como\nhash bcrypt.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Registra um novo usuário",
+                "parameters": [
+                    {
+                        "description": "Usuário e senha (mín. 8 caracteres)",
+                        "name": "credentials",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.registerRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/api.userResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "validação inválida",
+                        "schema": {
+                            "$ref": "#/definitions/api.errorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "usuário já existe",
+                        "schema": {
+                            "$ref": "#/definitions/api.errorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/healthz": {
             "get": {
                 "description": "Sinal de vida da aplicação.",
@@ -65,6 +203,11 @@ const docTemplate = `{
         },
         "/students": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Retorna uma página de estudantes com metadados de paginação\n(total, limit, offset). Aceita filtro opcional por ` + "`" + `active` + "`" + `.",
                 "produces": [
                     "application/json"
@@ -107,10 +250,21 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/api.errorResponse"
                         }
+                    },
+                    "401": {
+                        "description": "não autenticado",
+                        "schema": {
+                            "$ref": "#/definitions/api.errorResponse"
+                        }
                     }
                 }
             },
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Cria um estudante. O CPF deve ter 11 dígitos (só números), ser\nválido pelos dígitos verificadores e único; o e-mail deve ter\nformato válido. ` + "`" + `active` + "`" + ` é obrigatório.",
                 "consumes": [
                     "application/json"
@@ -146,6 +300,18 @@ const docTemplate = `{
                             "$ref": "#/definitions/api.errorResponse"
                         }
                     },
+                    "401": {
+                        "description": "não autenticado",
+                        "schema": {
+                            "$ref": "#/definitions/api.errorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "requer papel admin",
+                        "schema": {
+                            "$ref": "#/definitions/api.errorResponse"
+                        }
+                    },
                     "409": {
                         "description": "CPF já cadastrado",
                         "schema": {
@@ -157,6 +323,11 @@ const docTemplate = `{
         },
         "/students/{id}": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -186,6 +357,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/api.errorResponse"
                         }
                     },
+                    "401": {
+                        "description": "não autenticado",
+                        "schema": {
+                            "$ref": "#/definitions/api.errorResponse"
+                        }
+                    },
                     "404": {
                         "description": "não encontrado",
                         "schema": {
@@ -195,6 +372,11 @@ const docTemplate = `{
                 }
             },
             "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Atualização parcial: apenas os campos enviados são alterados.\nAs mesmas regras de validação de CPF e e-mail se aplicam.",
                 "consumes": [
                     "application/json"
@@ -237,6 +419,18 @@ const docTemplate = `{
                             "$ref": "#/definitions/api.errorResponse"
                         }
                     },
+                    "401": {
+                        "description": "não autenticado",
+                        "schema": {
+                            "$ref": "#/definitions/api.errorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "requer papel admin",
+                        "schema": {
+                            "$ref": "#/definitions/api.errorResponse"
+                        }
+                    },
                     "404": {
                         "description": "não encontrado",
                         "schema": {
@@ -252,6 +446,11 @@ const docTemplate = `{
                 }
             },
             "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "tags": [
                     "students"
                 ],
@@ -271,6 +470,18 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "ID inválido",
+                        "schema": {
+                            "$ref": "#/definitions/api.errorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "não autenticado",
+                        "schema": {
+                            "$ref": "#/definitions/api.errorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "requer papel admin",
                         "schema": {
                             "$ref": "#/definitions/api.errorResponse"
                         }
@@ -383,6 +594,72 @@ const docTemplate = `{
                     "type": "integer"
                 }
             }
+        },
+        "api.loginRequest": {
+            "type": "object",
+            "properties": {
+                "password": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.refreshRequest": {
+            "type": "object",
+            "properties": {
+                "refresh_token": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.registerRequest": {
+            "type": "object",
+            "properties": {
+                "password": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.tokenResponse": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string"
+                },
+                "refresh_token": {
+                    "type": "string"
+                },
+                "token_type": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.userResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "role": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "BearerAuth": {
+            "description": "Autentique em /auth/login e envie: \"Bearer \u003caccess_token\u003e\".",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
         }
     }
 }`

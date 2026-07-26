@@ -64,6 +64,43 @@ definitions:
       total:
         type: integer
     type: object
+  api.loginRequest:
+    properties:
+      password:
+        type: string
+      username:
+        type: string
+    type: object
+  api.refreshRequest:
+    properties:
+      refresh_token:
+        type: string
+    type: object
+  api.registerRequest:
+    properties:
+      password:
+        type: string
+      username:
+        type: string
+    type: object
+  api.tokenResponse:
+    properties:
+      access_token:
+        type: string
+      refresh_token:
+        type: string
+      token_type:
+        type: string
+    type: object
+  api.userResponse:
+    properties:
+      id:
+        type: integer
+      role:
+        type: string
+      username:
+        type: string
+    type: object
 info:
   contact:
     name: Students API
@@ -80,6 +117,102 @@ info:
   title: Students API
   version: "1.0"
 paths:
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: |-
+        Valida as credenciais e devolve um access token (JWT, curto) e um
+        refresh token (longo).
+      parameters:
+      - description: Usuário e senha
+        in: body
+        name: credentials
+        required: true
+        schema:
+          $ref: '#/definitions/api.loginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.tokenResponse'
+        "400":
+          description: corpo inválido
+          schema:
+            $ref: '#/definitions/api.errorResponse'
+        "401":
+          description: credenciais inválidas
+          schema:
+            $ref: '#/definitions/api.errorResponse'
+      summary: Autentica e emite tokens
+      tags:
+      - auth
+  /auth/refresh:
+    post:
+      consumes:
+      - application/json
+      description: |-
+        Troca um refresh token válido por um novo par de tokens. O refresh
+        usado é revogado (rotação).
+      parameters:
+      - description: Refresh token
+        in: body
+        name: token
+        required: true
+        schema:
+          $ref: '#/definitions/api.refreshRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.tokenResponse'
+        "400":
+          description: corpo inválido
+          schema:
+            $ref: '#/definitions/api.errorResponse'
+        "401":
+          description: refresh token inválido ou expirado
+          schema:
+            $ref: '#/definitions/api.errorResponse'
+      summary: Renova o access token
+      tags:
+      - auth
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      description: |-
+        Cria uma conta com papel `user`. A senha é armazenada apenas como
+        hash bcrypt.
+      parameters:
+      - description: Usuário e senha (mín. 8 caracteres)
+        in: body
+        name: credentials
+        required: true
+        schema:
+          $ref: '#/definitions/api.registerRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/api.userResponse'
+        "400":
+          description: validação inválida
+          schema:
+            $ref: '#/definitions/api.errorResponse'
+        "409":
+          description: usuário já existe
+          schema:
+            $ref: '#/definitions/api.errorResponse'
+      summary: Registra um novo usuário
+      tags:
+      - auth
   /healthz:
     get:
       description: Sinal de vida da aplicação.
@@ -141,6 +274,12 @@ paths:
           description: parâmetro inválido
           schema:
             $ref: '#/definitions/api.errorResponse'
+        "401":
+          description: não autenticado
+          schema:
+            $ref: '#/definitions/api.errorResponse'
+      security:
+      - BearerAuth: []
       summary: Lista estudantes (paginada)
       tags:
       - students
@@ -169,10 +308,20 @@ paths:
           description: corpo/validação inválidos
           schema:
             $ref: '#/definitions/api.errorResponse'
+        "401":
+          description: não autenticado
+          schema:
+            $ref: '#/definitions/api.errorResponse'
+        "403":
+          description: requer papel admin
+          schema:
+            $ref: '#/definitions/api.errorResponse'
         "409":
           description: CPF já cadastrado
           schema:
             $ref: '#/definitions/api.errorResponse'
+      security:
+      - BearerAuth: []
       summary: Cria um estudante
       tags:
       - students
@@ -191,10 +340,20 @@ paths:
           description: ID inválido
           schema:
             $ref: '#/definitions/api.errorResponse'
+        "401":
+          description: não autenticado
+          schema:
+            $ref: '#/definitions/api.errorResponse'
+        "403":
+          description: requer papel admin
+          schema:
+            $ref: '#/definitions/api.errorResponse'
         "404":
           description: não encontrado
           schema:
             $ref: '#/definitions/api.errorResponse'
+      security:
+      - BearerAuth: []
       summary: Remove um estudante
       tags:
       - students
@@ -216,10 +375,16 @@ paths:
           description: ID inválido
           schema:
             $ref: '#/definitions/api.errorResponse'
+        "401":
+          description: não autenticado
+          schema:
+            $ref: '#/definitions/api.errorResponse'
         "404":
           description: não encontrado
           schema:
             $ref: '#/definitions/api.errorResponse'
+      security:
+      - BearerAuth: []
       summary: Busca um estudante por ID
       tags:
       - students
@@ -252,6 +417,14 @@ paths:
           description: corpo/validação inválidos
           schema:
             $ref: '#/definitions/api.errorResponse'
+        "401":
+          description: não autenticado
+          schema:
+            $ref: '#/definitions/api.errorResponse'
+        "403":
+          description: requer papel admin
+          schema:
+            $ref: '#/definitions/api.errorResponse'
         "404":
           description: não encontrado
           schema:
@@ -260,10 +433,18 @@ paths:
           description: CPF já cadastrado
           schema:
             $ref: '#/definitions/api.errorResponse'
+      security:
+      - BearerAuth: []
       summary: Atualiza um estudante (parcial)
       tags:
       - students
 schemes:
 - http
 - https
+securityDefinitions:
+  BearerAuth:
+    description: 'Autentique em /auth/login e envie: "Bearer <access_token>".'
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"

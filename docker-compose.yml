@@ -18,6 +18,12 @@ services:
       DB_SSLMODE: "disable"
       REDIS_ADDR: "redis:6379"
       REDIS_TTL: "5m"
+      APP_ENV: "${APP_ENV:-development}"
+      JWT_SECRET: "${JWT_SECRET:-}"
+      JWT_ACCESS_TTL: "${JWT_ACCESS_TTL:-15m}"
+      JWT_REFRESH_TTL: "${JWT_REFRESH_TTL:-168h}"
+      ADMIN_USERNAME: "${ADMIN_USERNAME:-}"
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:-}"
     depends_on:
       postgres:
         condition: service_healthy

@@ -11,8 +11,39 @@ import (
 type Config struct {
 	Port     string
 	LogLevel string
+	AppEnv   string
 	DB       DBConfig
 	Redis    RedisConfig
+	Auth     AuthConfig
+	Admin    AdminSeed
+}
+
+// IsProduction indica se a aplicação roda em ambiente de produção.
+func (c Config) IsProduction() bool {
+	return c.AppEnv == "production"
+}
+
+// AuthConfig descreve os parâmetros de autenticação (JWT + refresh token).
+//
+// Secret assina os JWTs e nunca deve ser hardcoded. Em produção é obrigatório
+// (a aplicação falha no boot se estiver vazio); em desenvolvimento, quando vazio,
+// um segredo efêmero aleatório é gerado.
+type AuthConfig struct {
+	Secret     string
+	AccessTTL  time.Duration
+	RefreshTTL time.Duration
+}
+
+// AdminSeed permite provisionar um usuário admin inicial no boot. Quando ambos os
+// campos estão preenchidos e o usuário ainda não existe, ele é criado.
+type AdminSeed struct {
+	Username string
+	Password string
+}
+
+// Enabled indica se o seed de admin deve ser executado.
+func (a AdminSeed) Enabled() bool {
+	return a.Username != "" && a.Password != ""
 }
 
 // DBConfig descreve a conexão com o banco de dados.
@@ -66,6 +97,16 @@ func Load() Config {
 	return Config{
 		Port:     getEnv("PORT", "8080"),
 		LogLevel: getEnv("LOG_LEVEL", "info"),
+		AppEnv:   getEnv("APP_ENV", "development"),
+		Auth: AuthConfig{
+			Secret:     getEnv("JWT_SECRET", ""),
+			AccessTTL:  getEnvDuration("JWT_ACCESS_TTL", 15*time.Minute),
+			RefreshTTL: getEnvDuration("JWT_REFRESH_TTL", 7*24*time.Hour),
+		},
+		Admin: AdminSeed{
+			Username: getEnv("ADMIN_USERNAME", ""),
+			Password: getEnv("ADMIN_PASSWORD", ""),
+		},
 		DB: DBConfig{
 			Driver:   getEnv("DB_DRIVER", "postgres"),
 			Host:     getEnv("DB_HOST", "localhost"),
