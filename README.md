@@ -1,7 +1,7 @@
 # Students API
 
-[![CI](https://github.com/apolinario0x21/effective-octo-bassoon/actions/workflows/ci.yml/badge.svg)](https://github.com/apolinario0x21/effective-octo-bassoon/actions/workflows/ci.yml)
-[![Security](https://github.com/apolinario0x21/effective-octo-bassoon/actions/workflows/security.yml/badge.svg)](https://github.com/apolinario0x21/effective-octo-bassoon/actions/workflows/security.yml)
+[![CI](https://github.com/apolinario0x21/students-api/actions/workflows/ci.yml/badge.svg)](https://github.com/apolinario0x21/students-api/actions/workflows/ci.yml)
+[![Security](https://github.com/apolinario0x21/students-api/actions/workflows/security.yml/badge.svg)](https://github.com/apolinario0x21/students-api/actions/workflows/security.yml)
 
 API RESTful para gerenciar estudantes, escrita em Go com [Echo](https://echo.labstack.com/)
 e [GORM](https://gorm.io/). Persistência em **PostgreSQL**, cache em **Redis** e

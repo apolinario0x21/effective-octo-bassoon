@@ -1,4 +1,4 @@
-module github.com/apolinario0x21/effective-octo-bassoon
+module github.com/apolinario0x21/students-api
 
 go 1.25.0
 

@@ -13,11 +13,11 @@ import (
 	"github.com/rs/zerolog/log"
 	"gorm.io/gorm"
 
-	"github.com/apolinario0x21/effective-octo-bassoon/internal/api"
-	"github.com/apolinario0x21/effective-octo-bassoon/internal/cache"
-	"github.com/apolinario0x21/effective-octo-bassoon/internal/config"
-	"github.com/apolinario0x21/effective-octo-bassoon/internal/db"
-	"github.com/apolinario0x21/effective-octo-bassoon/internal/repository"
+	"github.com/apolinario0x21/students-api/internal/api"
+	"github.com/apolinario0x21/students-api/internal/cache"
+	"github.com/apolinario0x21/students-api/internal/config"
+	"github.com/apolinario0x21/students-api/internal/db"
+	"github.com/apolinario0x21/students-api/internal/repository"
 )
 
 const shutdownTimeout = 10 * time.Second

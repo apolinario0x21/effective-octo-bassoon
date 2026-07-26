@@ -3,7 +3,7 @@ package api
 import (
 	"context"
 
-	"github.com/apolinario0x21/effective-octo-bassoon/internal/models"
+	"github.com/apolinario0x21/students-api/internal/models"
 )
 
 // StudentRepository abstrai o acesso a dados de estudantes, permitindo

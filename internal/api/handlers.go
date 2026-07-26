@@ -9,7 +9,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/rs/zerolog/log"
 
-	"github.com/apolinario0x21/effective-octo-bassoon/internal/models"
+	"github.com/apolinario0x21/students-api/internal/models"
 )
 
 func jsonError(c echo.Context, status int, message string) error {
